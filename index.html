@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ManRPG-Mobile-2D v0.1</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="hud" id="hud"></section>
+
+    <section class="battle-wrap">
+      <canvas id="gameCanvas" width="960" height="360" aria-label="battle canvas"></canvas>
+      <div class="phase-panel" id="phasePanel"></div>
+    </section>
+  </main>
+
+  <section class="controls" id="controls">
+    <button data-action="left">왼쪽</button>
+    <button data-action="right">오른쪽</button>
+    <button data-action="jump">점프</button>
+    <button data-action="dash">대시</button>
+    <button data-action="attack">공격</button>
+    <button data-action="skill">스킬</button>
+    <button data-action="magic">마법</button>
+  </section>
+
+  <script src="game.js"></script>
+</body>
+</html>
