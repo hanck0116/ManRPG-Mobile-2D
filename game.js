@@ -589,6 +589,12 @@
     `;
   }
 
+
+  function appendSaveControls() {
+    phasePanel.insertAdjacentHTML('beforeend', saveButtonsHtml());
+    bindSaveButtons();
+  }
+
   function renderPhasePanel() {
     const notice = transientNotice.until > Date.now() ? `<div class="warn">${transientNotice.text}</div>` : '';
     if (state.gameState === 'initialStatAllocate') {
@@ -621,19 +627,18 @@
       phasePanel.querySelectorAll('.stat-minus').forEach(btn => btn.onclick = () => { decreaseStat(btn.dataset.key); renderPhasePanel(); });
       document.getElementById('recommendedInitialStats').onclick = () => { applyRecommendedInitialStats(); renderPhasePanel(); };
       document.getElementById('startFloorOneBattle').onclick = finishInitialStatAllocation;
-      phasePanel.innerHTML += saveButtonsHtml();
-      bindSaveButtons();
+      appendSaveControls();
       return;
     }
     if (state.gameState === 'battle') {
-      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}` + saveButtonsHtml();
-      bindSaveButtons();
+      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}`;
+      appendSaveControls();
       return;
     }
     if (state.gameState === 'defeated') {
-      phasePanel.innerHTML = '<div class="enemy">패배: HP가 0이 되어 전투에서 쓰러졌습니다.</div><button id="restartRun">처음부터 다시 시작</button>' + saveButtonsHtml();
+      phasePanel.innerHTML = '<div class="enemy">패배: HP가 0이 되어 전투에서 쓰러졌습니다.</div><button id="restartRun">처음부터 다시 시작</button>';
       document.getElementById('restartRun').onclick = restartFromDefeat;
-      bindSaveButtons();
+      appendSaveControls();
       return;
     }
     const p = state.innerPhase;
@@ -735,8 +740,7 @@
       phasePanel.innerHTML = '<div>8) nextFloor</div><button id="goNext">다음 층 진입</button>';
       document.getElementById('goNext').onclick = goNextFloor;
     }
-    phasePanel.innerHTML += saveButtonsHtml();
-    bindSaveButtons();
+    appendSaveControls();
   }
 
   function rectHit(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
@@ -1283,6 +1287,76 @@
       state.shopMessage = '';
       state.innerPhase = 'nextFloor';
       results.shopExitAdvancesToNextFloor = state.innerPhase === 'nextFloor' && state.shopMessage === '';
+
+
+      state.gameState = 'initialStatAllocate';
+      state.statAllocationBase = null;
+      player.str = 1; player.agi = 1; player.vit = 1; player.int = 1; player.wis = 1; player.looks = 1;
+      syncVitals();
+      renderPhasePanel();
+      const initialPlusButton = phasePanel.querySelector('.stat-plus[data-key="str"]');
+      const strBeforeInitialPlus = player.str;
+      if (initialPlusButton && typeof initialPlusButton.onclick === 'function') initialPlusButton.onclick();
+      results.initialStatButtonsRemainBoundAfterSaveControls = player.str === strBeforeInitialPlus + 1;
+
+      state.gameState = 'initialStatAllocate';
+      state.statAllocationBase = null;
+      player.str = 1; player.agi = 1; player.vit = 1; player.int = 1; player.wis = 1; player.looks = 1;
+      syncVitals();
+      renderPhasePanel();
+      const recommendBtn = document.getElementById('recommendedInitialStats');
+      if (recommendBtn && typeof recommendBtn.onclick === 'function') recommendBtn.onclick();
+      results.initialRecommendedButtonRemainBoundAfterSaveControls =
+        player.str === 16 && player.agi === 8 && player.vit === 21 && player.int === 5 && player.wis === 5 && player.looks === 5;
+
+      state.gameState = 'initialStatAllocate';
+      state.statAllocationBase = null;
+      player.str = 1; player.agi = 1; player.vit = 1; player.int = 1; player.wis = 1; player.looks = 1;
+      syncVitals();
+      renderPhasePanel();
+      const startBattleBtn = document.getElementById('startFloorOneBattle');
+      if (startBattleBtn && typeof startBattleBtn.onclick === 'function') startBattleBtn.onclick();
+      results.initialStartBattleButtonRemainBoundAfterSaveControls = state.gameState === 'battle';
+
+      state.gameState = 'innerWorld';
+      state.innerPhase = 'statAllocate';
+      state.statAllocationBase = null;
+      player.level = 10; player.str = 10; player.agi = 10; player.vit = 10; player.int = 10; player.wis = 10; player.looks = 10;
+      syncVitals();
+      renderPhasePanel();
+      const statAllocatePlusButton = phasePanel.querySelector('.stat-plus[data-key="str"]');
+      const strBeforeAllocatePlus = player.str;
+      if (statAllocatePlusButton && typeof statAllocatePlusButton.onclick === 'function') statAllocatePlusButton.onclick();
+      results.statAllocateButtonsRemainBoundAfterSaveControls = player.str === strBeforeAllocatePlus + 1;
+
+      state.gameState = 'innerWorld';
+      state.innerPhase = 'rewardPick';
+      state.rewardCandidates = ['추가 코인 +2', '외공서'];
+      state.rewardMeta = { candidateCount: 2, pickCount: 1 };
+      state.rewardSelected = new Set();
+      renderPhasePanel();
+      const rewardPickButton = phasePanel.querySelector('.pick[data-idx="0"]');
+      if (rewardPickButton && typeof rewardPickButton.onclick === 'function') rewardPickButton.onclick();
+      results.rewardPickButtonsRemainBoundAfterSaveControls = state.rewardSelected.has(0);
+
+      state.gameState = 'innerWorld';
+      state.innerPhase = 'shop';
+      player.coin = 999;
+      player.inventory = [];
+      renderPhasePanel();
+      const shopBuyButton = phasePanel.querySelector('.shop-buy');
+      const inventoryBeforeBuy = player.inventory.length;
+      if (shopBuyButton && typeof shopBuyButton.onclick === 'function') shopBuyButton.onclick();
+      results.shopButtonsRemainBoundAfterSaveControls = player.inventory.length > inventoryBeforeBuy;
+
+      state.gameState = 'battle';
+      renderPhasePanel();
+      const saveBtn = document.getElementById('saveGameBtn');
+      const loadBtn = document.getElementById('loadGameBtn');
+      const deleteBtn = document.getElementById('deleteSaveBtn');
+      results.saveButtonsRemainBoundAfterPhaseRender =
+        !!saveBtn && !!loadBtn && !!deleteBtn &&
+        typeof saveBtn.onclick === 'function' && typeof loadBtn.onclick === 'function' && typeof deleteBtn.onclick === 'function';
 
     } finally {
       Object.assign(player, backupPlayer);

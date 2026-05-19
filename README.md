@@ -207,3 +207,16 @@ window.ManRPG.runDebugTests()
   - fireballKillEntersInnerWorld
   - combatFeedbackClearsOnNextFloor
   - loadClearsCombatFeedback
+
+## UI 버튼 바인딩 안정화
+- 저장/불러오기 버튼 추가 후 스탯/보상/상점 버튼 이벤트가 사라지던 문제를 수정했습니다.
+- `renderPhasePanel()`에서는 `innerHTML +=` 사용을 금지했습니다.
+- 저장 버튼 부착은 `appendSaveControls()` + `insertAdjacentHTML()` + `bindSaveButtons()` 방식으로 통일했습니다.
+- runDebugTests 신규 키:
+  - `initialStatButtonsRemainBoundAfterSaveControls`
+  - `initialRecommendedButtonRemainBoundAfterSaveControls`
+  - `initialStartBattleButtonRemainBoundAfterSaveControls`
+  - `statAllocateButtonsRemainBoundAfterSaveControls`
+  - `rewardPickButtonsRemainBoundAfterSaveControls`
+  - `shopButtonsRemainBoundAfterSaveControls`
+  - `saveButtonsRemainBoundAfterPhaseRender`
