@@ -25,6 +25,7 @@
     itemUseMessage: '',
     shopMessage: '',
     saveMessage: '',
+    debugMessage: '',
   };
 
   const player = {
@@ -661,6 +662,32 @@
     bindSaveButtons();
   }
 
+  function debugControlsHtml() {
+    const msg = state.debugMessage ? `<div class="stat-message">${state.debugMessage}</div>` : '<div></div>';
+    return `<div class="save-row"><button id="runDebugTestsBtn">테스트 실행</button></div>${msg}`;
+  }
+
+  function summarizeDebugResults(results) {
+    const failedKeys = Object.keys(results).filter((key) => results[key] !== true);
+    if (failedKeys.length === 0) return '전체 테스트 통과';
+    return `실패 항목: ${failedKeys.join(', ')}`;
+  }
+
+  function bindDebugButtons() {
+    const t = document.getElementById('runDebugTestsBtn');
+    if (!t) return;
+    t.onclick = () => {
+      const results = runDebugTests();
+      state.debugMessage = summarizeDebugResults(results);
+      renderPhasePanel();
+    };
+  }
+
+  function appendDebugControls() {
+    phasePanel.insertAdjacentHTML('beforeend', debugControlsHtml());
+    bindDebugButtons();
+  }
+
   function renderPhasePanel() {
     const notice = transientNotice.until > Date.now() ? `<div class="warn">${transientNotice.text}</div>` : '';
     if (state.gameState === 'initialStatAllocate') {
@@ -807,6 +834,7 @@
       document.getElementById('goNext').onclick = goNextFloor;
     }
     appendSaveControls();
+    appendDebugControls();
   }
 
   function rectHit(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
@@ -1150,6 +1178,7 @@
       itemUseMessage: state.itemUseMessage,
       shopMessage: state.shopMessage,
       saveMessage: state.saveMessage,
+      debugMessage: state.debugMessage,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
@@ -1581,6 +1610,8 @@
       results.saveButtonsRemainBoundAfterPhaseRender =
         !!saveBtn && !!loadBtn && !!deleteBtn &&
         typeof saveBtn.onclick === 'function' && typeof loadBtn.onclick === 'function' && typeof deleteBtn.onclick === 'function';
+      const debugBtn = document.getElementById('runDebugTestsBtn');
+      results.debugTestButtonBoundAfterPhaseRender = !!debugBtn && typeof debugBtn.onclick === 'function';
 
       results.enemyTypesDefined = Array.isArray(enemyTypes) && enemyTypes.length === 5 &&
         enemyTypes.some(type => type.id === 'hungryWolf') && enemyTypes.some(type => type.id === 'goblin') &&
@@ -1631,6 +1662,7 @@
       state.itemUseMessage = backupState.itemUseMessage;
       state.shopMessage = backupState.shopMessage;
       state.saveMessage = backupState.saveMessage;
+      state.debugMessage = backupState.debugMessage;
       if (backupLocalSave === null) localStorage.removeItem(SAVE_KEY);
       else localStorage.setItem(SAVE_KEY, backupLocalSave);
       transientNotice = backupTransientNotice;
