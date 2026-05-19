@@ -26,7 +26,7 @@ window.ManRPG.runDebugTests()
 
 반환 객체의 모든 값이 `true`여야 합니다.
 
-## runDebugTests() 반환 키 목록
+## runDebugTests() 반환 키 목록 (주요 키)
 - rewardConfigLooks1
 - attackFormulaDiv10
 - enemyKillToInnerWorld
@@ -43,6 +43,8 @@ window.ManRPG.runDebugTests()
 - enterInnerWorldDoesNotAutoClearOrLevel
 - defeatedStopsBattleInput
 - restartFromDefeatResetsRun
+
+전체 키는 기능 추가에 따라 계속 늘어납니다. 최신 목록은 `game.js`의 `runDebugTests()` 구현을 기준으로 확인하세요.
 
 ## v0.1 안정화 2차 확인 항목
 - 다음 층 진입 시 HP/MP 최대 회복
@@ -250,6 +252,7 @@ window.ManRPG.runDebugTests()
 
 ## 플레이어 피격 안정화 v0.1
 - 적 공격 전조 추가
+- 전조 중 적 이동 정지
 - 피격 후 짧은 무적시간 추가
 - 플레이어 피격 깜빡임 추가
 - 피격 넉백 추가
@@ -263,5 +266,6 @@ window.ManRPG.runDebugTests()
   - playerDamageCanDefeat
   - enemyAttackUsesWindup
   - enemyAttackMissesIfOutOfRangeAfterWindup
+  - enemyStopsMovingDuringWindup
   - playerHitStateClearsOnNextFloor
   - loadClearsPlayerHitState
