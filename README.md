@@ -26,6 +26,17 @@ window.ManRPG.runDebugTests()
 
 반환 객체의 모든 값이 `true`여야 합니다.
 
+## 모바일 디버그 테스트 버튼 v0.1
+- 모바일 화면의 phasePanel 하단에 `테스트 실행` 버튼이 추가되었습니다.
+- 버튼을 누르면 `runDebugTests()`가 실행되고 결과 요약이 짧게 표시됩니다.
+  - 모든 키가 `true`면 `전체 테스트 통과`
+  - 하나라도 `false`면 `실패 항목: key1, key2 ...`
+- 실행 방법:
+  1. GitHub Pages 게임 화면 접속
+  2. 패널 하단의 `테스트 실행` 버튼 누르기
+  3. `전체 테스트 통과` 또는 실패 항목 확인
+- 브라우저 콘솔 방식(`window.ManRPG.runDebugTests()`)도 계속 사용할 수 있습니다.
+
 ## runDebugTests() 반환 키 목록 (주요 키)
 - rewardConfigLooks1
 - attackFormulaDiv10
@@ -231,6 +242,7 @@ window.ManRPG.runDebugTests()
   - `rewardPickButtonsRemainBoundAfterSaveControls`
   - `shopButtonsRemainBoundAfterSaveControls`
   - `saveButtonsRemainBoundAfterPhaseRender`
+  - `debugTestButtonBoundAfterPhaseRender`
 
 ## 1층 적 5종 v0.1
 
