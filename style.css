@@ -89,3 +89,22 @@ body {
 }
 .stat-row span { min-width: 90px; }
 .stat-row button { min-width: 84px; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.stat-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.stat-message {
+  font-size: 13px;
+  color: #cfe8ff;
+  margin: 6px 0;
+}

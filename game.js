@@ -314,7 +314,8 @@
         <div>남은 포인트: ${remainingPoints()}</div>
         <div>총 스탯 포인트: ${totalStatPoints()}</div>
         <div>스탯 최대치: ${statMax()}</div>
-        ${statLabels.map(([key, label]) => {
+        <div class="stat-message">이번 단계에서 올린 수치만 - 버튼으로 되돌릴 수 있습니다.</div>
+        <div class="stat-grid">${statLabels.map(([key, label]) => {
           const canIncrease = canIncreaseAny && player[key] < statMax();
           const canDecrease = state.statAllocationBase && player[key] > state.statAllocationBase[key];
           return `<div class="stat-row">
@@ -324,8 +325,8 @@
               <button class="stat-minus" data-key="${key}" ${canDecrease ? '' : 'disabled'}>-${label}</button>
             </div>
           </div>`;
-        }).join('')}
-        <div>
+        }).join('')}</div>
+        <div class="stat-actions">
           <button id="finishStat">분배 완료</button>
           <button id="skipStat">건너뛰기</button>
         </div>`;
@@ -616,7 +617,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, increaseStat, decreaseStat, finishStatAllocation, runDebugTests };
+  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, runDebugTests };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
