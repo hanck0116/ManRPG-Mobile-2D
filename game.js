@@ -1108,8 +1108,9 @@
       player.str = 1; player.vit = 1; syncVitals(); results.attackFormulaDiv10 = computeDerived().baseAtk === (Math.floor((1+1)/10)+2);
       player.str = oldStr; player.vit = oldVit; syncVitals();
 
-      state.gameState = 'battle'; enemy.alive=true; enemy.hp = 0; updateBattle(0.016);
-      results.enemyKillToInnerWorld = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset';
+      state.gameState = 'battle'; enemy.alive = true; enemy.hp = 1;
+      applyEnemyDamage(2, 0, 'test');
+      results.enemyKillToInnerWorld = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset' && enemy.alive === false;
 
       const c0 = player.coin; applyReward('추가 코인 +2'); results.rewardApplyCoin = player.coin === c0 + 2;
       const inv0 = player.inventory.length; applyReward('외공서'); results.rewardApplyInventory = player.inventory.length === inv0 + 1;
@@ -1460,7 +1461,7 @@
         !!saveBtn && !!loadBtn && !!deleteBtn &&
         typeof saveBtn.onclick === 'function' && typeof loadBtn.onclick === 'function' && typeof deleteBtn.onclick === 'function';
 
-      results.enemyTypesDefined = enemyTypes.length === 5 &&
+      results.enemyTypesDefined = Array.isArray(enemyTypes) && enemyTypes.length === 5 &&
         enemyTypes.some(type => type.id === 'hungryWolf') && enemyTypes.some(type => type.id === 'goblin') &&
         enemyTypes.some(type => type.id === 'slime') && enemyTypes.some(type => type.id === 'skeleton') && enemyTypes.some(type => type.id === 'bat');
 
