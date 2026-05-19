@@ -963,6 +963,7 @@
   }
 
   function updateBattle(dt) {
+    if (state.gameState !== 'battle') return;
     if (hitStopTimer > 0) {
       hitStopTimer = Math.max(0, hitStopTimer - dt);
       return;
@@ -1196,17 +1197,19 @@
       enemy.attackCd = 0; enemy.atk = 10; enemy.alive = true; enemy.x = player.x;
       applyPlayerDamage(enemy.atk, 0);
       results.playerDeathToDefeatState = state.gameState === 'defeated' && player.hp === 0;
+      resetInput();
+      clearCombatFeedback();
       keys.left = true; keys.attack = true;
       const xBeforeDefeated = player.x;
       const enemyHpBeforeDefeated = enemy.hp;
       updateBattle(0.016);
       results.defeatedStopsBattleInput = player.x === xBeforeDefeated && enemy.hp === enemyHpBeforeDefeated && state.gameState === 'defeated';
 
-      state.gameState = 'battle'; keys.skill = true; keys.magic = true;
+      state.gameState = 'battle'; resetInput(); clearCombatFeedback(); keys.skill = true; keys.magic = true;
       updateBattle(0.016);
       results.skillMagicButtonsSafe = transientNotice.text.length > 0 && state.gameState === 'battle';
 
-      state.gameState = 'battle'; enemy.alive = true; enemy.hp = 100; enemy.x = player.x + 40; enemy.y = player.y;
+      state.gameState = 'battle'; resetInput(); clearCombatFeedback(); enemy.alive = true; enemy.hp = 100; enemy.x = player.x + 40; enemy.y = player.y;
       player.mp = 100; player.skillCooldown = 0; player.facing = 1;
       const mpBeforeSkill = player.mp;
       useHarvestSlash();
@@ -1220,6 +1223,7 @@
       useHarvestSlash();
       results.harvestSlashCooldownBlocksRepeat = enemy.hp === hpBeforeRepeat && player.mp === mpBeforeRepeat;
 
+      resetInput(); clearCombatFeedback();
       player.magicCooldown = 0; player.mp = 100; player.int = 10; enemy.hp = 100; enemy.x = player.x + 30; enemy.y = player.y;
       projectiles = [];
       const mpBeforeMagic = player.mp;
@@ -1435,7 +1439,7 @@
       applyPlayerDamage(5, 0);
       results.playerDamageCanDefeat = state.gameState === 'defeated' && player.hp === 0;
 
-      state.gameState = 'battle'; state.innerPhase = null; enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
+      state.gameState = 'battle'; state.innerPhase = null; resetInput(); clearCombatFeedback(); enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
       enemy.x = player.x + 20; enemy.y = player.y; enemy.attackCd = 0; enemy.windupTimer = 0; enemy.pendingAttack = false;
       const hpBeforeWindup = player.hp;
       updateBattle(0.016);
@@ -1444,7 +1448,7 @@
       updateBattle(0.3);
       results.enemyAttackUsesWindup = windupStarted && noInstantDamage && player.hp < hpBeforeWindup;
 
-      state.gameState = 'battle'; enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
+      state.gameState = 'battle'; resetInput(); clearCombatFeedback(); enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
       enemy.x = player.x + 20; enemy.y = player.y; enemy.attackCd = 0; enemy.windupTimer = 0; enemy.pendingAttack = false;
       updateBattle(0.016);
       player.x = canvas.width - player.w;
@@ -1452,7 +1456,7 @@
       updateBattle(0.3);
       results.enemyAttackMissesIfOutOfRangeAfterWindup = player.hp === hpBeforeMiss;
 
-      state.gameState = 'battle'; enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
+      state.gameState = 'battle'; resetInput(); clearCombatFeedback(); enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
       enemy.x = player.x + 20; enemy.y = player.y; enemy.attackCd = 0; enemy.windupTimer = 0; enemy.pendingAttack = false;
       updateBattle(0.016);
       const windupX = enemy.x;
@@ -1482,7 +1486,7 @@
       const stableAfterRepeatDefeat = handleEnemyDefeated('test') === false;
       results.enemyDefeatEntersInnerWorldOnce = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset' && enemy.alive === false && stableAfterRepeatDefeat;
 
-      state.gameState = 'battle'; state.innerPhase = null; enemy.alive = true; enemy.hp = 100; enemy.hurtTimer = 0; clearCombatFeedback(); enemy.x = player.x + 40; enemy.y = player.y;
+      state.gameState = 'battle'; state.innerPhase = null; resetInput(); clearCombatFeedback(); enemy.alive = true; enemy.hp = 100; enemy.hurtTimer = 0; enemy.x = player.x + 40; enemy.y = player.y;
       keys.attack = true; player.attackCooldown = 0; player.facing = 1;
       updateBattle(0.016);
       results.basicAttackUsesApplyEnemyDamage = enemy.hurtTimer > 0 || hitStopTimer > 0;
@@ -1637,6 +1641,10 @@
       screenShakeTimer = backupScreenShakeTimer;
       screenShakeMagnitude = backupScreenShakeMagnitude;
       enemy.hurtTimer = typeof backupEnemy.hurtTimer === 'number' ? backupEnemy.hurtTimer : 0;
+      enemy.windupTimer = typeof backupEnemy.windupTimer === 'number' ? backupEnemy.windupTimer : 0;
+      enemy.pendingAttack = !!backupEnemy.pendingAttack;
+      player.invincibleTimer = typeof backupPlayer.invincibleTimer === 'number' ? backupPlayer.invincibleTimer : 0;
+      player.hurtTimer = typeof backupPlayer.hurtTimer === 'number' ? backupPlayer.hurtTimer : 0;
       derived = computeDerived();
     }
     results.debugTestsRestoreState =
