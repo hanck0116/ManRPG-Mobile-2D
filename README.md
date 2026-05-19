@@ -59,7 +59,7 @@ window.ManRPG.runDebugTests()
 ## 현재 구현된 기능
 - 2D 횡스크롤 전투 기본 루프
 - 플레이어 이동/점프/대시/기본공격
-- 적 1종 추적 및 근접 공격
+- 1층 적 5종(굶주린 늑대/고블린/슬라임/해골 병사/박쥐 마물)
 - 층 상승 시 적 HP/공격력 증가
 - 적 처치 시 심상세계 진입
 - innerPhase 단계 패널 진행
@@ -67,9 +67,9 @@ window.ManRPG.runDebugTests()
   - fiveLevelPlus
   - rewardRoll
   - rewardPick
-  - statAllocate(건너뛰기)
-  - skillTechMagicTrait(건너뛰기)
-  - shop(건너뛰기)
+  - statAllocate(실제 스탯 분배)
+  - skillTechMagicTrait(아이템 사용)
+  - shop(구매/판매)
   - nextFloor
 - 외모 기반 보상 후보/선택 수 규칙
 - 코인 보상 및 인벤토리 반영
@@ -77,17 +77,26 @@ window.ManRPG.runDebugTests()
 - 패배(defeated) 및 처음부터 다시 시작
 
 ## v0.1 현재 제한
-- 스킬/마법은 안내만 표시
-- 스탯 분배는 건너뛰기
-- 상점은 건너뛰기
-- 저장 기능 없음
+- 전체 스킬/마법 시스템 미구현(현재는 수확 베기, 작은 화염구만 구현)
+- 한 번에 적 1마리만 등장
+- 보스 없음
+- 랜덤맵 없음
+- knownMagic 기반 마법 잠금 미적용
+- 전승 시스템 미구현
+- 픽셀아트 에셋 없음
 
-## 다음 작업 순서
-1. 스탯 분배 UI
-2. 아이템 사용
-3. 상점
-4. 스킬/마법 1종씩 전투 적용
-5. 저장/불러오기
+## 현재 전투/성장 구현 요약
+- 기본 공격 + 수확 베기 + 작은 화염구
+- 전투 피드백(hit stop/screen shake/hurt flash)
+- 초기 스탯 분배 + 추천 분배
+- 심상세계 단계 진행 + 보상 선택
+- statAllocate 실제 분배
+- skillTechMagicTrait 아이템 사용
+- shop 구매/판매
+- 저장/불러오기/삭제
+- 패배/재시작
+- phasePanel 버튼 바인딩 안정화(appendSaveControls)
+
 
 ## statAllocate 스탯 분배 v0.1
 
