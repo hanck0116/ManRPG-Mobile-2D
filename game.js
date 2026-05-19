@@ -5,6 +5,7 @@
   const phasePanel = document.getElementById('phasePanel');
   const controls = document.getElementById('controls');
   let transientNotice = { text: '', until: 0 };
+  const SAVE_KEY = 'manrpg_mobile_2d_save_v1';
 
   const state = {
     gameState: 'initialStatAllocate',
@@ -23,6 +24,7 @@
     statAllocationBase: null,
     itemUseMessage: '',
     shopMessage: '',
+    saveMessage: '',
   };
 
   const player = {
@@ -366,6 +368,141 @@
     player.mp = derived.maxMp;
   }
 
+  function serializeGameState() {
+    return {
+      state: {
+        gameState: state.gameState,
+        innerPhase: state.innerPhase,
+        floor: state.floor,
+        rewardCandidates: [...state.rewardCandidates],
+        rewardSelected: [...state.rewardSelected],
+        rewardMeta: state.rewardMeta ? { ...state.rewardMeta } : null,
+        statusEffects: Array.isArray(state.statusEffects) ? [...state.statusEffects] : [],
+        원영사용됨: state.원영사용됨,
+        정령왕사용됨: state.정령왕사용됨,
+        헤일로사용됨: state.헤일로사용됨,
+        헤일로강화준비: state.헤일로강화준비,
+        빙백연혼사용됨: state.빙백연혼사용됨,
+        자기상환배수: state.자기상환배수,
+        statAllocationBase: state.statAllocationBase ? { ...state.statAllocationBase } : null,
+        itemUseMessage: state.itemUseMessage,
+        shopMessage: state.shopMessage,
+      },
+      player: {
+        name: player.name, title: player.title, mantra: player.mantra,
+        level: player.level, coin: player.coin,
+        str: player.str, agi: player.agi, vit: player.vit, int: player.int, wis: player.wis, looks: player.looks,
+        outer: player.outer, inner: player.inner, swordAura: player.swordAura, multicasting: player.multicasting,
+        x: player.x, y: player.y, vx: player.vx, vy: player.vy, hp: player.hp, mp: player.mp,
+        attackCooldown: player.attackCooldown, dashCooldown: player.dashCooldown, facing: player.facing,
+        knownMagic: [...player.knownMagic], inventory: [...player.inventory],
+      },
+      enemy: {
+        alive: enemy.alive, x: enemy.x, y: enemy.y, w: enemy.w, h: enemy.h, vx: enemy.vx,
+        hp: enemy.hp, maxHp: enemy.maxHp, atk: enemy.atk, attackCd: enemy.attackCd,
+      },
+    };
+  }
+
+  function applySerializedGameState(data) {
+    try {
+      if (!data || typeof data !== 'object' || !data.state || !data.player || !data.enemy) return false;
+      const s = data.state;
+      const p = data.player;
+      const e = data.enemy;
+      if (!Array.isArray(s.rewardSelected) || !Array.isArray(p.inventory) || !Array.isArray(p.knownMagic)) return false;
+
+      state.gameState = s.gameState;
+      state.innerPhase = s.innerPhase;
+      state.floor = s.floor;
+      state.rewardCandidates = Array.isArray(s.rewardCandidates) ? [...s.rewardCandidates] : [];
+      state.rewardSelected = new Set(s.rewardSelected);
+      state.rewardMeta = s.rewardMeta && typeof s.rewardMeta === 'object' ? { ...s.rewardMeta } : { candidateCount: 2, pickCount: 1 };
+      state.statusEffects = Array.isArray(s.statusEffects) ? [...s.statusEffects] : [];
+      state.원영사용됨 = !!s.원영사용됨;
+      state.정령왕사용됨 = !!s.정령왕사용됨;
+      state.헤일로사용됨 = !!s.헤일로사용됨;
+      state.헤일로강화준비 = !!s.헤일로강화준비;
+      state.빙백연혼사용됨 = !!s.빙백연혼사용됨;
+      state.자기상환배수 = typeof s.자기상환배수 === 'number' ? s.자기상환배수 : 1;
+      state.statAllocationBase = s.statAllocationBase && typeof s.statAllocationBase === 'object' ? { ...s.statAllocationBase } : null;
+      state.itemUseMessage = typeof s.itemUseMessage === 'string' ? s.itemUseMessage : '';
+      state.shopMessage = typeof s.shopMessage === 'string' ? s.shopMessage : '';
+
+      Object.assign(player, p);
+      player.inventory = [...p.inventory];
+      player.knownMagic = [...p.knownMagic];
+
+      Object.assign(enemy, e);
+
+      syncVitals();
+      player.hp = Math.min(player.hp, derived.maxHp);
+      player.mp = Math.min(player.mp, derived.maxMp);
+      player.vx = 0;
+      player.vy = 0;
+      player.attackCooldown = 0;
+      player.dashCooldown = 0;
+      resetInput();
+      transientNotice = { text: '', until: 0 };
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function saveGame() {
+    try {
+      const data = serializeGameState();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      state.saveMessage = '저장 완료';
+      return true;
+    } catch (err) {
+      state.saveMessage = '저장 실패';
+      return false;
+    }
+  }
+
+  function loadGame() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        state.saveMessage = '불러오기 실패';
+        return false;
+      }
+      const data = JSON.parse(raw);
+      const ok = applySerializedGameState(data);
+      state.saveMessage = ok ? '불러오기 완료' : '불러오기 실패';
+      return ok;
+    } catch (err) {
+      state.saveMessage = '불러오기 실패';
+      return false;
+    }
+  }
+
+  function deleteSave() {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      state.saveMessage = '저장 데이터 삭제 완료';
+      return true;
+    } catch (err) {
+      state.saveMessage = '저장 실패';
+      return false;
+    }
+  }
+
+  function saveButtonsHtml() {
+    return `<div class="save-row"><button id="saveGameBtn">저장</button><button id="loadGameBtn">불러오기</button><button id="deleteSaveBtn">저장 삭제</button></div><div>${state.saveMessage || ''}</div>`;
+  }
+
+  function bindSaveButtons() {
+    const s = document.getElementById('saveGameBtn');
+    const l = document.getElementById('loadGameBtn');
+    const d = document.getElementById('deleteSaveBtn');
+    if (s) s.onclick = () => saveGame();
+    if (l) l.onclick = () => loadGame();
+    if (d) d.onclick = () => deleteSave();
+  }
+
   function enterInnerWorld() {
     state.itemUseMessage = '';
     state.shopMessage = '';
@@ -457,15 +594,19 @@
       phasePanel.querySelectorAll('.stat-minus').forEach(btn => btn.onclick = () => { decreaseStat(btn.dataset.key); renderPhasePanel(); });
       document.getElementById('recommendedInitialStats').onclick = () => { applyRecommendedInitialStats(); renderPhasePanel(); };
       document.getElementById('startFloorOneBattle').onclick = finishInitialStatAllocation;
+      phasePanel.innerHTML += saveButtonsHtml();
+      bindSaveButtons();
       return;
     }
     if (state.gameState === 'battle') {
-      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}`;
+      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}` + saveButtonsHtml();
+      bindSaveButtons();
       return;
     }
     if (state.gameState === 'defeated') {
-      phasePanel.innerHTML = '<div class="enemy">패배: HP가 0이 되어 전투에서 쓰러졌습니다.</div><button id="restartRun">처음부터 다시 시작</button>';
+      phasePanel.innerHTML = '<div class="enemy">패배: HP가 0이 되어 전투에서 쓰러졌습니다.</div><button id="restartRun">처음부터 다시 시작</button>' + saveButtonsHtml();
       document.getElementById('restartRun').onclick = restartFromDefeat;
+      bindSaveButtons();
       return;
     }
     const p = state.innerPhase;
@@ -567,6 +708,8 @@
       phasePanel.innerHTML = '<div>8) nextFloor</div><button id="goNext">다음 층 진입</button>';
       document.getElementById('goNext').onclick = goNextFloor;
     }
+    phasePanel.innerHTML += saveButtonsHtml();
+    bindSaveButtons();
   }
 
   function rectHit(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
@@ -586,6 +729,7 @@
     state.statAllocationBase = null;
     state.itemUseMessage = '';
     state.shopMessage = '';
+    state.saveMessage = '';
     state.statusEffects = [];
     state.원영사용됨 = false;
     state.정령왕사용됨 = false;
@@ -698,12 +842,14 @@
       statAllocationBase: state.statAllocationBase ? JSON.parse(JSON.stringify(state.statAllocationBase)) : null,
       itemUseMessage: state.itemUseMessage,
       shopMessage: state.shopMessage,
+      saveMessage: state.saveMessage,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
     const backupDerived = JSON.parse(JSON.stringify(derived));
     const backupTransientNotice = JSON.parse(JSON.stringify(transientNotice));
     const backupKeys = JSON.parse(JSON.stringify(keys));
+    const backupLocalSave = localStorage.getItem(SAVE_KEY);
     const results = {};
     try {
       const oldLooks = player.looks; player.looks = 1;
@@ -890,6 +1036,37 @@
       const unknownSell = sellInventoryItem(0);
       results.unknownItemSellFails = !unknownSell && player.inventory.length === 1 && player.inventory[0] === '알 수 없는 아이템';
 
+
+      const serialized = serializeGameState();
+      results.serializeIncludesCoreState = !!serialized.state && !!serialized.player && !!serialized.enemy && Array.isArray(serialized.state.rewardSelected);
+
+      const backupRoundTrip = serializeGameState();
+      player.coin = 111;
+      state.floor = 7;
+      player.inventory = ['검기', '내공서'];
+      saveGame();
+      player.coin = 5;
+      state.floor = 2;
+      player.inventory = [];
+      const roundTripLoaded = loadGame();
+      results.saveLoadRoundTripRestoresState = roundTripLoaded && player.coin === 111 && state.floor === 7 && player.inventory.length === 2;
+      applySerializedGameState(backupRoundTrip);
+
+      saveGame();
+      deleteSave();
+      results.deleteSaveClearsStorage = localStorage.getItem(SAVE_KEY) === null;
+
+      localStorage.removeItem(SAVE_KEY);
+      results.loadMissingSaveFailsSafely = loadGame() === false;
+
+      const beforeInvalid = serializeGameState();
+      localStorage.setItem(SAVE_KEY, '{invalid json');
+      const invalidJsonFail = loadGame() === false;
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ nope: true }));
+      const invalidShapeFail = loadGame() === false;
+      const afterInvalid = serializeGameState();
+      results.loadInvalidSaveFailsSafely = invalidJsonFail && invalidShapeFail && JSON.stringify(beforeInvalid) === JSON.stringify(afterInvalid);
+
       state.innerPhase = 'shop';
       state.shopMessage = '테스트';
       state.shopMessage = '';
@@ -909,6 +1086,9 @@
       state.statAllocationBase = backupState.statAllocationBase ? JSON.parse(JSON.stringify(backupState.statAllocationBase)) : null;
       state.itemUseMessage = backupState.itemUseMessage;
       state.shopMessage = backupState.shopMessage;
+      state.saveMessage = backupState.saveMessage;
+      if (backupLocalSave === null) localStorage.removeItem(SAVE_KEY);
+      else localStorage.setItem(SAVE_KEY, backupLocalSave);
       transientNotice = backupTransientNotice;
       resetInput();
       Object.assign(keys, backupKeys);
@@ -922,6 +1102,7 @@
       JSON.stringify(state.statAllocationBase) === JSON.stringify(backupState.statAllocationBase) &&
       state.itemUseMessage === backupState.itemUseMessage &&
       state.shopMessage === backupState.shopMessage &&
+      state.saveMessage === backupState.saveMessage &&
       player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
       JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
       player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
@@ -933,7 +1114,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, runDebugTests };
+  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, runDebugTests, SAVE_KEY };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);

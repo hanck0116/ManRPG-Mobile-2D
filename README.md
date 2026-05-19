@@ -156,3 +156,18 @@ window.ManRPG.runDebugTests()
   - shopSellRemovesOneItem
   - unknownItemSellFails
   - shopExitAdvancesToNextFloor
+
+## 저장 / 불러오기 v0.1
+- 모바일 브라우저 `localStorage`에 저장됩니다.
+- `저장` 버튼으로 현재 진행 상태를 저장합니다.
+- `불러오기` 버튼으로 저장된 상태를 복원합니다.
+- `저장 삭제` 버튼으로 저장 데이터를 삭제합니다.
+- 브라우저 캐시/사이트 데이터 삭제 시 저장 데이터도 사라질 수 있습니다.
+- 다른 기기와 동기화되지 않습니다.
+- GitHub Pages 주소가 바뀌면 저장 데이터가 분리될 수 있습니다.
+- `runDebugTests()` 신규 키:
+  - `serializeIncludesCoreState`
+  - `saveLoadRoundTripRestoresState`
+  - `deleteSaveClearsStorage`
+  - `loadMissingSaveFailsSafely`
+  - `loadInvalidSaveFailsSafely`
