@@ -269,3 +269,11 @@ window.ManRPG.runDebugTests()
   - enemyStopsMovingDuringWindup
   - playerHitStateClearsOnNextFloor
   - loadClearsPlayerHitState
+
+
+## runDebugTests 신뢰도 안정화 v0.1
+
+- `updateBattle(dt)` 시작부에 `state.gameState !== 'battle'` 방어 코드를 추가해 비전투 상태(`defeated`, `innerWorld`, `initialStatAllocate`)에서 직접 호출되어도 이동/공격/피해 처리가 진행되지 않도록 했습니다.
+- `runDebugTests()`의 전투 시나리오들 사이에 `resetInput()`과 `clearCombatFeedback()` 초기화를 보강해 입력/피드백 잔여 상태로 인한 테스트 간섭을 줄였습니다.
+- `defeatedStopsBattleInput` 검증을 강화해 `defeated` 상태에서 `updateBattle(0.016)` 직접 호출 시 플레이어 위치와 적 HP가 유지되는지 확인합니다.
+- `debugTestsRestoreState`의 복구 안정성을 위해 테스트 종료 후 `keys`, `projectiles`, `hitStopTimer`, `screenShakeTimer`, `enemy.windupTimer`, `enemy.pendingAttack`, `player.invincibleTimer`, `player.hurtTimer`가 원래 값으로 되돌아가도록 복구 경로를 명시했습니다.
