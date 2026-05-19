@@ -220,3 +220,21 @@ window.ManRPG.runDebugTests()
   - `rewardPickButtonsRemainBoundAfterSaveControls`
   - `shopButtonsRemainBoundAfterSaveControls`
   - `saveButtonsRemainBoundAfterPhaseRender`
+
+## 1층 적 5종 v0.1
+
+- 굶주린 늑대: 빠른 근접형
+- 고블린: 표준 근접형
+- 슬라임: 느린 탱커형
+- 해골 병사: 사거리가 조금 긴 근접형
+- 박쥐 마물: 공중형
+- 현재는 한 번에 적 1마리만 등장
+- 층이 오르면 적 HP와 공격력 증가
+- runDebugTests 신규 키:
+  - enemyTypesDefined
+  - spawnEnemyAssignsType
+  - spawnEnemyScalesByFloor
+  - flyingEnemyUsesFlyingY
+  - enemyHudHasName
+  - enemySaveLoadKeepsType
+  - enemyTypeRenderSafe

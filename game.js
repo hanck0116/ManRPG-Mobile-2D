@@ -44,7 +44,19 @@
   let screenShakeTimer = 0;
   let screenShakeMagnitude = 0;
 
-  const enemy = { alive: true, x: 740, y: 280, w: 34, h: 48, vx: 0, hp: 16, maxHp: 16, atk: 3, attackCd: 0, hurtTimer: 0 };
+  const enemyTypes = [
+    { id: 'hungryWolf', name: '굶주린 늑대', hpBase: 18, hpPerFloor: 7, atkBase: 3, atkPerFloor: 2, speed: 95, width: 38, height: 34, color: '#4a4a4a', aiType: 'fastMelee', attackRange: 34, attackCooldown: 0.9, description: '빠르게 접근하는 근접형 적' },
+    { id: 'goblin', name: '고블린', hpBase: 22, hpPerFloor: 8, atkBase: 4, atkPerFloor: 2, speed: 70, width: 34, height: 48, color: '#41a34d', aiType: 'melee', attackRange: 38, attackCooldown: 1.1, description: '표준 근접형 적' },
+    { id: 'slime', name: '슬라임', hpBase: 32, hpPerFloor: 10, atkBase: 3, atkPerFloor: 2, speed: 45, width: 44, height: 32, color: '#6d7cff', aiType: 'tank', attackRange: 32, attackCooldown: 1.4, description: '느리지만 체력이 높은 적' },
+    { id: 'skeleton', name: '해골 병사', hpBase: 24, hpPerFloor: 9, atkBase: 5, atkPerFloor: 2, speed: 55, width: 34, height: 52, color: '#e6dcc8', aiType: 'guard', attackRange: 48, attackCooldown: 1.3, description: '사거리가 조금 긴 근접형 적' },
+    { id: 'bat', name: '박쥐 마물', hpBase: 14, hpPerFloor: 6, atkBase: 3, atkPerFloor: 2, speed: 100, width: 32, height: 26, color: '#452c6a', aiType: 'flying', attackRange: 30, attackCooldown: 0.8, description: '공중에서 빠르게 접근하는 적' }
+  ];
+
+  const enemy = {
+    typeId: 'goblin', name: '고블린', aiType: 'melee', speed: 70, attackRange: 38, attackCooldownBase: 1.1,
+    color: '#41a34d', description: '표준 근접형 적', isFlying: false,
+    alive: true, x: 740, y: 280, w: 34, h: 48, vx: 0, hp: 16, maxHp: 16, atk: 3, attackCd: 0, hurtTimer: 0
+  };
 
   const keys = { left:false,right:false,jump:false,dash:false,attack:false,skill:false,magic:false };
   const auraTable = {
@@ -279,12 +291,31 @@
     player.hp = Math.max(0, player.hp);
   }
 
+  function pickEnemyTypeForFloor(floor) {
+    const floorOnePool = enemyTypes;
+    return floorOnePool[Math.floor(Math.random() * floorOnePool.length)] || floorOnePool[1];
+  }
+
   function spawnEnemy() {
+    const type = pickEnemyTypeForFloor(state.floor);
+    enemy.typeId = type.id;
+    enemy.name = type.name;
+    enemy.aiType = type.aiType;
+    enemy.speed = type.speed;
+    enemy.attackRange = type.attackRange;
+    enemy.attackCooldownBase = type.attackCooldown;
+    enemy.color = type.color;
+    enemy.description = type.description;
+    enemy.isFlying = type.aiType === 'flying';
     enemy.alive = true;
-    enemy.maxHp = 12 + state.floor * 8;
+    enemy.maxHp = type.hpBase + state.floor * type.hpPerFloor;
     enemy.hp = enemy.maxHp;
-    enemy.atk = 2 + state.floor * 2;
+    enemy.atk = type.atkBase + state.floor * type.atkPerFloor;
+    enemy.w = type.width;
+    enemy.h = type.height;
     enemy.x = 720;
+    enemy.y = enemy.isFlying ? 220 : 280;
+    enemy.vx = 0;
     enemy.attackCd = 0;
     enemy.hurtTimer = 0;
   }
@@ -415,6 +446,9 @@
       enemy: {
         alive: enemy.alive, x: enemy.x, y: enemy.y, w: enemy.w, h: enemy.h, vx: enemy.vx,
         hp: enemy.hp, maxHp: enemy.maxHp, atk: enemy.atk, attackCd: enemy.attackCd,
+        typeId: enemy.typeId, name: enemy.name, aiType: enemy.aiType, speed: enemy.speed,
+        attackRange: enemy.attackRange, attackCooldownBase: enemy.attackCooldownBase, color: enemy.color,
+        description: enemy.description, isFlying: enemy.isFlying,
       },
     };
   }
@@ -449,6 +483,16 @@
       player.knownMagic = [...p.knownMagic];
 
       Object.assign(enemy, e);
+      const fallback = enemyTypes.find(type => type.id === (enemy.typeId || 'goblin')) || enemyTypes.find(type => type.id === 'goblin') || enemyTypes[0];
+      enemy.typeId = typeof enemy.typeId === 'string' ? enemy.typeId : fallback.id;
+      enemy.name = typeof enemy.name === 'string' ? enemy.name : fallback.name;
+      enemy.aiType = typeof enemy.aiType === 'string' ? enemy.aiType : fallback.aiType;
+      enemy.speed = typeof enemy.speed === 'number' ? enemy.speed : fallback.speed;
+      enemy.attackRange = typeof enemy.attackRange === 'number' ? enemy.attackRange : fallback.attackRange;
+      enemy.attackCooldownBase = typeof enemy.attackCooldownBase === 'number' ? enemy.attackCooldownBase : fallback.attackCooldown;
+      enemy.color = typeof enemy.color === 'string' ? enemy.color : fallback.color;
+      enemy.description = typeof enemy.description === 'string' ? enemy.description : fallback.description;
+      enemy.isFlying = typeof enemy.isFlying === 'boolean' ? enemy.isFlying : (enemy.aiType === 'flying');
 
       syncVitals();
       player.hp = Math.min(player.hp, derived.maxHp);
@@ -494,6 +538,7 @@
       player.magicCooldown = 0;
       projectiles = [];
       clearCombatFeedback();
+      enemy.hurtTimer = 0;
       state.saveMessage = ok ? '불러오기 완료' : '불러오기 실패';
       return ok;
     } catch (err) {
@@ -583,7 +628,10 @@
       <div>최종 평타: ${derived.atk}</div>
       <div>외공/내공/검기/멀티캐스팅: ${player.outer}/${player.inner}/${player.swordAura}/${player.multicasting}</div>
       <div>스킬 CD: ${player.skillCooldown.toFixed(1)} | 마법 CD: ${player.magicCooldown.toFixed(1)}</div>
+      <div class="enemy">적: ${enemy.name || '알 수 없음'}</div>
+      <div>${enemy.description || ''}</div>
       <div class="enemy">적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>
+      <div>적 공격력: ${enemy.atk}</div>
       <div>인벤토리 수: ${player.inventory.length}</div>
       <div>인벤토리: ${player.inventory.length ? player.inventory.join(', ') : '없음'}</div>
     `;
@@ -631,7 +679,7 @@
       return;
     }
     if (state.gameState === 'battle') {
-      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}`;
+      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적: ${enemy.name || '알 수 없음'}</div><div>설명: ${enemy.description || ''}</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div><div>적 공격력: ${enemy.atk}</div>${notice}`;
       appendSaveControls();
       return;
     }
@@ -904,12 +952,29 @@
     if (enemy.hurtTimer > 0) enemy.hurtTimer = Math.max(0, enemy.hurtTimer - dt);
     updateProjectiles(dt);
 
-    if (enemy.alive) {
-      const dir = Math.sign(player.x - enemy.x);
-      enemy.x += dir * 120 * dt;
+    if (enemy.alive && state.gameState === 'battle') {
+      enemy.attackCd = Math.max(0, enemy.attackCd - dt);
+      const baseSpeed = enemy.speed || 70;
+      let speedMul = 1;
+      let range = enemy.attackRange || 38;
+      if (enemy.aiType === 'fastMelee') speedMul = 1.2;
+      if (enemy.aiType === 'tank') speedMul = 0.8;
+      if (enemy.aiType === 'guard') speedMul = 0.9;
+      if (enemy.aiType === 'flying') speedMul = 1.05;
+      const xDir = Math.sign(player.x - enemy.x);
+      enemy.x += xDir * baseSpeed * speedMul * dt;
+      if (enemy.aiType === 'flying') {
+        const targetY = Math.max(180, Math.min(280, player.y - 40));
+        enemy.y += Math.sign(targetY - enemy.y) * Math.min(65 * dt, Math.abs(targetY - enemy.y));
+      } else {
+        enemy.y = 280;
+      }
       enemy.x = Math.max(0, Math.min(canvas.width - enemy.w, enemy.x));
-      enemy.attackCd -= dt;
-      if (Math.abs(player.x - enemy.x) < 42 && enemy.attackCd <= 0) { player.hp -= enemy.atk; enemy.attackCd = 0.9; }
+      const yDiff = Math.abs(player.y - enemy.y);
+      if (Math.abs(player.x - enemy.x) < range && yDiff < 70 && enemy.attackCd <= 0) {
+        player.hp -= enemy.atk;
+        enemy.attackCd = enemy.attackCooldownBase || 1;
+      }
     }
     if (player.hp <= 0) {
       player.hp = 0;
@@ -932,7 +997,44 @@
     ctx.fillStyle = '#1e2f45'; ctx.fillRect(0,330,canvas.width,30);
     renderProjectiles();
     ctx.fillStyle = '#6be675'; ctx.fillRect(player.x, player.y, player.w, player.h);
-    if (enemy.alive) { ctx.fillStyle = enemy.hurtTimer > 0 ? '#ffd6d6' : '#ff6b6b'; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h); }
+    if (enemy.alive) {
+      const enemyColor = enemy.hurtTimer > 0 ? '#ffd6d6' : (enemy.color || '#ff6b6b');
+      ctx.fillStyle = enemyColor;
+      if (enemy.typeId === 'slime') {
+        ctx.beginPath();
+        ctx.ellipse(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, enemy.w / 2, enemy.h / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (enemy.typeId === 'bat') {
+        ctx.fillRect(enemy.x + 8, enemy.y + 8, enemy.w - 16, enemy.h - 8);
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + 8, enemy.y + 14);
+        ctx.lineTo(enemy.x - 4, enemy.y + 2);
+        ctx.lineTo(enemy.x + 4, enemy.y + 18);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + enemy.w - 8, enemy.y + 14);
+        ctx.lineTo(enemy.x + enemy.w + 4, enemy.y + 2);
+        ctx.lineTo(enemy.x + enemy.w - 4, enemy.y + 18);
+        ctx.fill();
+      } else if (enemy.typeId === 'hungryWolf') {
+        ctx.fillRect(enemy.x, enemy.y + 8, enemy.w, enemy.h - 8);
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + 8, enemy.y + 8);
+        ctx.lineTo(enemy.x + 14, enemy.y - 2);
+        ctx.lineTo(enemy.x + 18, enemy.y + 8);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + 20, enemy.y + 8);
+        ctx.lineTo(enemy.x + 26, enemy.y - 2);
+        ctx.lineTo(enemy.x + 30, enemy.y + 8);
+        ctx.fill();
+      } else {
+        ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(enemy.name || '', enemy.x, Math.max(14, enemy.y - 4));
+    }
     if (keys.skill) { ctx.fillStyle='#ffe066'; ctx.fillRect(10,10,20,20); }
     if (keys.magic) { ctx.fillStyle='#a29bfe'; ctx.fillRect(40,10,20,20); }
     if (screenShakeTimer > 0) ctx.restore();
@@ -1358,6 +1460,41 @@
         !!saveBtn && !!loadBtn && !!deleteBtn &&
         typeof saveBtn.onclick === 'function' && typeof loadBtn.onclick === 'function' && typeof deleteBtn.onclick === 'function';
 
+      results.enemyTypesDefined = enemyTypes.length === 5 &&
+        enemyTypes.some(type => type.id === 'hungryWolf') && enemyTypes.some(type => type.id === 'goblin') &&
+        enemyTypes.some(type => type.id === 'slime') && enemyTypes.some(type => type.id === 'skeleton') && enemyTypes.some(type => type.id === 'bat');
+
+      spawnEnemy();
+      results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType;
+
+      state.floor = 1; spawnEnemy();
+      const floorOneHp = enemy.maxHp;
+      const floorOneAtk = enemy.atk;
+      state.floor = 5; spawnEnemy();
+      results.spawnEnemyScalesByFloor = enemy.maxHp > floorOneHp || enemy.atk > floorOneAtk;
+
+      const oldPicker = pickEnemyTypeForFloor;
+      pickEnemyTypeForFloor = () => enemyTypes.find(type => type.id === 'bat');
+      state.floor = 1; spawnEnemy();
+      pickEnemyTypeForFloor = oldPicker;
+      results.flyingEnemyUsesFlyingY = enemy.isFlying && enemy.y <= 240;
+
+      state.gameState = 'battle';
+      renderHUD();
+      results.enemyHudHasName = hudEl.textContent.includes(enemy.name);
+
+      state.floor = 3; spawnEnemy();
+      const enemyTypeBeforeSave = { typeId: enemy.typeId, name: enemy.name, aiType: enemy.aiType };
+      const enemyTypeSaveData = serializeGameState();
+      applySerializedGameState(enemyTypeSaveData);
+      results.enemySaveLoadKeepsType = enemy.typeId === enemyTypeBeforeSave.typeId && enemy.name === enemyTypeBeforeSave.name && enemy.aiType === enemyTypeBeforeSave.aiType;
+
+      results.enemyTypeRenderSafe = enemyTypes.every((type) => {
+        enemy.typeId = type.id; enemy.name = type.name; enemy.aiType = type.aiType; enemy.color = type.color;
+        enemy.w = type.width; enemy.h = type.height; enemy.y = type.aiType === 'flying' ? 220 : 280; enemy.alive = true;
+        try { renderCanvas(); return true; } catch (err) { return false; }
+      });
+
     } finally {
       Object.assign(player, backupPlayer);
       Object.assign(enemy, backupEnemy);
@@ -1406,7 +1543,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY };
+  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
