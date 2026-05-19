@@ -35,8 +35,11 @@
     x: 150, y: 280, w: 30, h: 50, vx: 0, vy: 0,
     hp: 10, mp: 15,
     attackCooldown: 0, dashCooldown: 0, facing: 1,
+    skillCooldown: 0, magicCooldown: 0,
     knownMagic: [], inventory: []
   };
+
+  let projectiles = [];
 
   const enemy = { alive: true, x: 740, y: 280, w: 34, h: 48, vx: 0, hp: 16, maxHp: 16, atk: 3, attackCd: 0 };
 
@@ -74,6 +77,7 @@
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
+    projectiles = [];
   }
 
   function decreaseStat(key) {
@@ -109,6 +113,7 @@
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
+    projectiles = [];
     spawnEnemy();
   }
 
@@ -124,6 +129,7 @@
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
+    projectiles = [];
   }
 
   function removeInventoryAt(index) {
@@ -296,6 +302,7 @@
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
+    projectiles = [];
   }
 
   function rewardConfig() {
@@ -363,9 +370,11 @@
   function resetPlayerForBattle() {
     player.x = 150; player.y = 280; player.vx = 0; player.vy = 0;
     player.attackCooldown = 0; player.dashCooldown = 0; player.facing = 1;
+    player.skillCooldown = 0; player.magicCooldown = 0;
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
+    projectiles = [];
   }
 
   function serializeGameState() {
@@ -395,6 +404,7 @@
         outer: player.outer, inner: player.inner, swordAura: player.swordAura, multicasting: player.multicasting,
         x: player.x, y: player.y, vx: player.vx, vy: player.vy, hp: player.hp, mp: player.mp,
         attackCooldown: player.attackCooldown, dashCooldown: player.dashCooldown, facing: player.facing,
+        skillCooldown: player.skillCooldown, magicCooldown: player.magicCooldown,
         knownMagic: [...player.knownMagic], inventory: [...player.inventory],
       },
       enemy: {
@@ -442,6 +452,9 @@
       player.vy = 0;
       player.attackCooldown = 0;
       player.dashCooldown = 0;
+      player.skillCooldown = typeof p.skillCooldown === 'number' ? p.skillCooldown : 0;
+      player.magicCooldown = typeof p.magicCooldown === 'number' ? p.magicCooldown : 0;
+      projectiles = [];
       resetInput();
       transientNotice = { text: '', until: 0 };
       return true;
@@ -471,6 +484,9 @@
       }
       const data = JSON.parse(raw);
       const ok = applySerializedGameState(data);
+      player.skillCooldown = 0;
+      player.magicCooldown = 0;
+      projectiles = [];
       state.saveMessage = ok ? '불러오기 완료' : '불러오기 실패';
       return ok;
     } catch (err) {
@@ -512,6 +528,7 @@
     resetRewardState();
     transientNotice = { text: '', until: 0 };
     state.statAllocationBase = null;
+    projectiles = [];
   }
 
   function goNextFloor() {
@@ -556,6 +573,7 @@
       <div>기본 평타: ${derived.baseAtk}</div>
       <div>최종 평타: ${derived.atk}</div>
       <div>외공/내공/검기/멀티캐스팅: ${player.outer}/${player.inner}/${player.swordAura}/${player.multicasting}</div>
+      <div>스킬 CD: ${player.skillCooldown.toFixed(1)} | 마법 CD: ${player.magicCooldown.toFixed(1)}</div>
       <div class="enemy">적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>
       <div>인벤토리 수: ${player.inventory.length}</div>
       <div>인벤토리: ${player.inventory.length ? player.inventory.join(', ') : '없음'}</div>
@@ -719,6 +737,58 @@
     transientNotice = { text, until: Date.now() + 1500 };
   }
 
+
+  function useHarvestSlash() {
+    if (state.gameState !== 'battle' || !enemy.alive) return;
+    if (player.skillCooldown > 0) return showBattleNotice('스킬 재사용 대기 중입니다.');
+    if (player.mp < 20) return showBattleNotice('MP가 부족합니다.');
+    player.mp -= 20;
+    player.skillCooldown = 1.2;
+    showBattleNotice('수확 베기!');
+    const range = 95;
+    const inFront = player.facing === 1 ? (enemy.x - (player.x + player.w) <= range && enemy.x >= player.x) : (player.x - (enemy.x + enemy.w) <= range && enemy.x <= player.x);
+    if (inFront && Math.abs(enemy.y - player.y) <= 70) {
+      enemy.hp -= derived.atk * 2;
+      enemy.x += enemy.x >= player.x ? 35 : -35;
+      enemy.x = Math.max(0, Math.min(canvas.width - enemy.w, enemy.x));
+    }
+  }
+
+  function castSmallFireball() {
+    if (state.gameState !== 'battle' || !enemy.alive) return;
+    if (player.magicCooldown > 0) return showBattleNotice('마법 재사용 대기 중입니다.');
+    if (player.mp < 15) return showBattleNotice('MP가 부족합니다.');
+    player.mp -= 15;
+    player.magicCooldown = 1.0;
+    projectiles.push({ type:'fireball', x: player.facing === 1 ? player.x + player.w : player.x - 12, y: player.y + player.h * 0.45, vx: player.facing * 420, w:12, h:12, damage: Math.max(1, Math.floor(player.int * 3)), alive:true });
+    showBattleNotice('작은 화염구!');
+  }
+
+  function updateProjectiles(dt) {
+    for (const p of projectiles) {
+      if (!p.alive) continue;
+      p.x += p.vx * dt;
+      if (p.x + p.w < 0 || p.x > canvas.width) { p.alive = false; continue; }
+      if (enemy.alive && rectHit(p, enemy)) {
+        enemy.hp -= p.damage;
+        p.alive = false;
+        enemy.x += enemy.x >= p.x ? 12 : -12;
+        enemy.x = Math.max(0, Math.min(canvas.width - enemy.w, enemy.x));
+      }
+    }
+    projectiles = projectiles.filter(p => p.alive);
+  }
+
+  function renderProjectiles() {
+    for (const p of projectiles) {
+      if (p.type !== 'fireball' || !p.alive) continue;
+      ctx.fillStyle = '#ff7f11';
+      ctx.beginPath();
+      ctx.arc(p.x + p.w / 2, p.y + p.h / 2, Math.max(4, p.w / 2), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   function restartFromDefeat() {
     state.floor = 1;
     state.gameState = 'initialStatAllocate';
@@ -748,8 +818,8 @@
   }
 
   function updateBattle(dt) {
-    if (keys.skill) { showBattleNotice('스킬은 아직 미구현입니다.'); keys.skill = false; }
-    if (keys.magic) { showBattleNotice('마법은 아직 미구현입니다.'); keys.magic = false; }
+    if (keys.skill) { useHarvestSlash(); keys.skill = false; }
+    if (keys.magic) { castSmallFireball(); keys.magic = false; }
     const speed = 230;
     if (keys.left) { player.vx = -speed; player.facing = -1; }
     else if (keys.right) { player.vx = speed; player.facing = 1; }
@@ -773,6 +843,9 @@
     player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
     if (player.y >= 280) { player.y = 280; player.vy = 0; }
     player.attackCooldown -= dt; player.dashCooldown -= dt;
+    player.skillCooldown = Math.max(0, player.skillCooldown - dt);
+    player.magicCooldown = Math.max(0, player.magicCooldown - dt);
+    updateProjectiles(dt);
 
     if (enemy.alive) {
       const dir = Math.sign(player.x - enemy.x);
@@ -794,6 +867,7 @@
   function renderCanvas() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#1e2f45'; ctx.fillRect(0,330,canvas.width,30);
+    renderProjectiles();
     ctx.fillStyle = '#6be675'; ctx.fillRect(player.x, player.y, player.w, player.h);
     if (enemy.alive) { ctx.fillStyle = '#ff6b6b'; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h); }
     if (keys.skill) { ctx.fillStyle='#ffe066'; ctx.fillRect(10,10,20,20); }
@@ -849,6 +923,7 @@
     const backupDerived = JSON.parse(JSON.stringify(derived));
     const backupTransientNotice = JSON.parse(JSON.stringify(transientNotice));
     const backupKeys = JSON.parse(JSON.stringify(keys));
+    const backupProjectiles = JSON.parse(JSON.stringify(projectiles));
     const backupLocalSave = localStorage.getItem(SAVE_KEY);
     const results = {};
     try {
@@ -893,6 +968,41 @@
       state.gameState = 'battle'; keys.skill = true; keys.magic = true;
       updateBattle(0.016);
       results.skillMagicButtonsSafe = transientNotice.text.length > 0 && state.gameState === 'battle';
+
+      state.gameState = 'battle'; enemy.alive = true; enemy.hp = 100; enemy.x = player.x + 40; enemy.y = player.y;
+      player.mp = 100; player.skillCooldown = 0; player.facing = 1;
+      const mpBeforeSkill = player.mp;
+      useHarvestSlash();
+      results.harvestSlashConsumesMp = player.mp === mpBeforeSkill - 20;
+      const hpBeforeSlash = enemy.hp;
+      player.skillCooldown = 0;
+      useHarvestSlash();
+      results.harvestSlashDamagesEnemy = enemy.hp < hpBeforeSlash;
+      const hpBeforeRepeat = enemy.hp;
+      const mpBeforeRepeat = player.mp;
+      useHarvestSlash();
+      results.harvestSlashCooldownBlocksRepeat = enemy.hp === hpBeforeRepeat && player.mp === mpBeforeRepeat;
+
+      player.magicCooldown = 0; player.mp = 100; player.int = 10; enemy.hp = 100; enemy.x = player.x + 30; enemy.y = player.y;
+      projectiles = [];
+      const mpBeforeMagic = player.mp;
+      castSmallFireball();
+      results.fireballConsumesMp = player.mp === mpBeforeMagic - 15 && projectiles.length > 0;
+      updateProjectiles(0.2);
+      results.fireballProjectileHitsEnemy = enemy.hp < 100 && projectiles.length === 0;
+
+      player.mp = 0; player.skillCooldown = 0; enemy.hp = 100; transientNotice = { text: '', until: 0 };
+      useHarvestSlash();
+      results.skillFailsWithoutMp = player.mp === 0 && enemy.hp === 100 && transientNotice.text.includes('MP가 부족');
+      player.magicCooldown = 0; projectiles = []; transientNotice = { text: '', until: 0 };
+      castSmallFireball();
+      results.magicFailsWithoutMp = projectiles.length === 0 && transientNotice.text.includes('MP가 부족');
+
+      projectiles = [{ type:'fireball', x:10, y:10, vx:0, w:10, h:10, damage:1, alive:true }];
+      state.floor = 1; state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor';
+      goNextFloor();
+      results.projectilesClearOnNextFloor = projectiles.length === 0;
+
 
       player.level = 9; player.coin = 33; player.str = 7; player.agi = 6; player.vit = 5; player.int = 4; player.wis = 3; player.looks = 2;
       player.outer = 2; player.inner = 1; player.swordAura = 3; player.multicasting = 4;
@@ -1039,6 +1149,7 @@
 
       const serialized = serializeGameState();
       results.serializeIncludesCoreState = !!serialized.state && !!serialized.player && !!serialized.enemy && Array.isArray(serialized.state.rewardSelected);
+      results.skillMagicCooldownSavedOrResetSafely = Number.isFinite(serialized.player.skillCooldown) && Number.isFinite(serialized.player.magicCooldown) && serialized.player.skillCooldown >= 0 && serialized.player.magicCooldown >= 0;
 
       const backupRoundTrip = serializeGameState();
       player.coin = 111;
@@ -1092,6 +1203,7 @@
       transientNotice = backupTransientNotice;
       resetInput();
       Object.assign(keys, backupKeys);
+      projectiles = JSON.parse(JSON.stringify(backupProjectiles));
       derived = computeDerived();
     }
     results.debugTestsRestoreState =
@@ -1110,11 +1222,11 @@
       derived.maxHp === backupDerived.maxHp && derived.maxMp === backupDerived.maxMp && derived.mpRegen === backupDerived.mpRegen &&
       derived.baseAtk === backupDerived.baseAtk && derived.atk === backupDerived.atk &&
       transientNotice.text === backupTransientNotice.text && transientNotice.until === backupTransientNotice.until &&
-      JSON.stringify(keys) === JSON.stringify(backupKeys);
+      JSON.stringify(keys) === JSON.stringify(backupKeys) && JSON.stringify(projectiles) === JSON.stringify(backupProjectiles);
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, runDebugTests, SAVE_KEY };
+  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, runDebugTests, SAVE_KEY };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
