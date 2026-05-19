@@ -189,3 +189,21 @@ window.ManRPG.runDebugTests()
   - magicFailsWithoutMp
   - projectilesClearOnNextFloor
   - skillMagicCooldownSavedOrResetSafely
+
+## 전투 피드백 v0.1
+
+- 기본 공격, 수확 베기, 작은 화염구 적중 시 적 피격 피드백 추가
+- hit stop 추가
+- 화면 흔들림 추가
+- 적 피격 깜빡임 추가
+- 적 사망 처리 중복 방지
+- runDebugTests 신규 키:
+  - applyEnemyDamageReducesHp
+  - applyEnemyDamageSetsHurtTimer
+  - applyEnemyDamageTriggersHitStop
+  - applyEnemyDamageTriggersScreenShake
+  - enemyDefeatEntersInnerWorldOnce
+  - basicAttackUsesApplyEnemyDamage
+  - fireballKillEntersInnerWorld
+  - combatFeedbackClearsOnNextFloor
+  - loadClearsCombatFeedback
