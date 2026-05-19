@@ -141,3 +141,18 @@ window.ManRPG.runDebugTests()
 - useMagicBookSuccessRemovesBook
 - useMagicBookFailureKeepsBook
 - skillResetTicketNotConsumed
+
+## shop 상점 v0.1
+
+- 코인으로 마법서, 무공서, 초기화권을 구매할 수 있음
+- 인벤토리 아이템을 판매할 수 있음
+- 판매가는 아이템별로 다름
+- 코인이 부족하면 구매 불가
+- 상점 종료 후 nextFloor 단계로 이동
+- runDebugTests 신규 키 목록:
+  - shopBuyItemConsumesCoin
+  - shopBuyFailsWithoutCoin
+  - shopSellItemAddsCoin
+  - shopSellRemovesOneItem
+  - unknownItemSellFails
+  - shopExitAdvancesToNextFloor
