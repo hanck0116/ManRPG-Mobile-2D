@@ -1009,13 +1009,16 @@
       if (enemy.aiType === 'tank') speedMul = 0.8;
       if (enemy.aiType === 'guard') speedMul = 0.9;
       if (enemy.aiType === 'flying') speedMul = 1.05;
-      const xDir = Math.sign(player.x - enemy.x);
-      enemy.x += xDir * baseSpeed * speedMul * dt;
-      if (enemy.aiType === 'flying') {
-        const targetY = Math.max(180, Math.min(280, player.y - 40));
-        enemy.y += Math.sign(targetY - enemy.y) * Math.min(65 * dt, Math.abs(targetY - enemy.y));
-      } else {
-        enemy.y = 280;
+      const inWindup = enemy.pendingAttack || enemy.windupTimer > 0;
+      if (!inWindup) {
+        const xDir = Math.sign(player.x - enemy.x);
+        enemy.x += xDir * baseSpeed * speedMul * dt;
+        if (enemy.aiType === 'flying') {
+          const targetY = Math.max(180, Math.min(280, player.y - 40));
+          enemy.y += Math.sign(targetY - enemy.y) * Math.min(65 * dt, Math.abs(targetY - enemy.y));
+        } else {
+          enemy.y = 280;
+        }
       }
       enemy.x = Math.max(0, Math.min(canvas.width - enemy.w, enemy.x));
       const yDiff = Math.abs(player.y - enemy.y);
@@ -1189,8 +1192,9 @@
       player.level = 1; player.int = 1; player.inner = 0; player.swordAura = 1; syncVitals();
       results.swordAuraMpModifierApplied = derived.maxMp === 0;
 
-      state.gameState = 'battle'; player.hp = 1; enemy.attackCd = 0; enemy.atk = 10; enemy.alive = true; enemy.x = player.x;
-      updateBattle(0.016);
+      state.gameState = 'battle'; state.innerPhase = null; player.hp = 1; player.invincibleTimer = 0;
+      enemy.attackCd = 0; enemy.atk = 10; enemy.alive = true; enemy.x = player.x;
+      applyPlayerDamage(enemy.atk, 0);
       results.playerDeathToDefeatState = state.gameState === 'defeated' && player.hp === 0;
       keys.left = true; keys.attack = true;
       const xBeforeDefeated = player.x;
@@ -1243,7 +1247,7 @@
       state.statusEffects = ['dummy']; state.floor = 5; state.gameState = 'defeated'; state.innerPhase = 'shop';
       restartFromDefeat();
       results.restartFromDefeatResetsRun =
-        state.floor === 1 && state.gameState === 'battle' && state.innerPhase === null &&
+        state.floor === 1 && state.gameState === 'initialStatAllocate' && state.innerPhase === null &&
         state.rewardCandidates.length === 0 && state.rewardSelected.size === 0 &&
         state.rewardMeta.candidateCount === 2 && state.rewardMeta.pickCount === 1 &&
         state.statusEffects.length === 0 && !state.원영사용됨 && !state.정령왕사용됨 &&
@@ -1447,6 +1451,14 @@
       const hpBeforeMiss = player.hp;
       updateBattle(0.3);
       results.enemyAttackMissesIfOutOfRangeAfterWindup = player.hp === hpBeforeMiss;
+
+      state.gameState = 'battle'; enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
+      enemy.x = player.x + 20; enemy.y = player.y; enemy.attackCd = 0; enemy.windupTimer = 0; enemy.pendingAttack = false;
+      updateBattle(0.016);
+      const windupX = enemy.x;
+      const windupY = enemy.y;
+      updateBattle(0.12);
+      results.enemyStopsMovingDuringWindup = enemy.pendingAttack && enemy.x === windupX && enemy.y === windupY;
 
       state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor';
       player.invincibleTimer = 0.5; player.hurtTimer = 0.5; enemy.windupTimer = 0.5; enemy.pendingAttack = true;
