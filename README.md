@@ -247,3 +247,21 @@ window.ManRPG.runDebugTests()
   - enemyHudHasName
   - enemySaveLoadKeepsType
   - enemyTypeRenderSafe
+
+## 플레이어 피격 안정화 v0.1
+- 적 공격 전조 추가
+- 피격 후 짧은 무적시간 추가
+- 플레이어 피격 깜빡임 추가
+- 피격 넉백 추가
+- 무적시간 중에는 추가 피해를 받지 않음
+- 공격 전조 후 플레이어가 범위 밖으로 벗어나면 공격이 빗나감
+- runDebugTests 신규 키:
+  - applyPlayerDamageReducesHp
+  - playerInvincibilityBlocksRepeatDamage
+  - playerDamageSetsHurtTimer
+  - playerDamageKnockbackClamps
+  - playerDamageCanDefeat
+  - enemyAttackUsesWindup
+  - enemyAttackMissesIfOutOfRangeAfterWindup
+  - playerHitStateClearsOnNextFloor
+  - loadClearsPlayerHitState

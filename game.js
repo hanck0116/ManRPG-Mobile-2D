@@ -36,6 +36,7 @@
     hp: 10, mp: 15,
     attackCooldown: 0, dashCooldown: 0, facing: 1,
     skillCooldown: 0, magicCooldown: 0,
+    invincibleTimer: 0, hurtTimer: 0,
     knownMagic: [], inventory: []
   };
 
@@ -55,7 +56,7 @@
   const enemy = {
     typeId: 'goblin', name: '고블린', aiType: 'melee', speed: 70, attackRange: 38, attackCooldownBase: 1.1,
     color: '#41a34d', description: '표준 근접형 적', isFlying: false,
-    alive: true, x: 740, y: 280, w: 34, h: 48, vx: 0, hp: 16, maxHp: 16, atk: 3, attackCd: 0, hurtTimer: 0
+    alive: true, x: 740, y: 280, w: 34, h: 48, vx: 0, hp: 16, maxHp: 16, atk: 3, attackCd: 0, hurtTimer: 0, windupTimer: 0, pendingAttack: false
   };
 
   const keys = { left:false,right:false,jump:false,dash:false,attack:false,skill:false,magic:false };
@@ -92,6 +93,8 @@
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
+    player.invincibleTimer = 0;
+    player.hurtTimer = 0;
     projectiles = [];
   }
 
@@ -318,6 +321,8 @@
     enemy.vx = 0;
     enemy.attackCd = 0;
     enemy.hurtTimer = 0;
+    enemy.windupTimer = 0;
+    enemy.pendingAttack = false;
   }
 
   function clearReset() {
@@ -407,6 +412,7 @@
     player.x = 150; player.y = 280; player.vx = 0; player.vy = 0;
     player.attackCooldown = 0; player.dashCooldown = 0; player.facing = 1;
     player.skillCooldown = 0; player.magicCooldown = 0;
+    player.invincibleTimer = 0; player.hurtTimer = 0;
     syncVitals();
     player.hp = derived.maxHp;
     player.mp = derived.maxMp;
@@ -503,6 +509,10 @@
       player.dashCooldown = 0;
       player.skillCooldown = typeof p.skillCooldown === 'number' ? p.skillCooldown : 0;
       player.magicCooldown = typeof p.magicCooldown === 'number' ? p.magicCooldown : 0;
+      player.invincibleTimer = 0;
+      player.hurtTimer = 0;
+      enemy.windupTimer = 0;
+      enemy.pendingAttack = false;
       projectiles = [];
       clearCombatFeedback();
       resetInput();
@@ -539,6 +549,10 @@
       projectiles = [];
       clearCombatFeedback();
       enemy.hurtTimer = 0;
+      enemy.windupTimer = 0;
+      enemy.pendingAttack = false;
+      player.invincibleTimer = 0;
+      player.hurtTimer = 0;
       state.saveMessage = ok ? '불러오기 완료' : '불러오기 실패';
       return ok;
     } catch (err) {
@@ -582,6 +596,8 @@
     state.statAllocationBase = null;
     projectiles = [];
     clearCombatFeedback();
+    enemy.windupTimer = 0;
+    enemy.pendingAttack = false;
   }
 
   function goNextFloor() {
@@ -596,6 +612,8 @@
     state.statAllocationBase = null;
     resetPlayerForBattle();
     clearCombatFeedback();
+    enemy.windupTimer = 0;
+    enemy.pendingAttack = false;
     spawnEnemy();
   }
 
@@ -841,6 +859,31 @@
     return true;
   }
 
+
+  function applyPlayerDamage(damage, knockback = 0) {
+    if (state.gameState !== 'battle') return false;
+    if (player.invincibleTimer > 0) return false;
+    if (!(damage > 0)) return false;
+    player.hp -= damage;
+    player.hurtTimer = 0.25;
+    player.invincibleTimer = 0.8;
+    if (knockback) {
+      player.x += knockback;
+      player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
+    }
+    startScreenShake(0.12, 3);
+    if (player.hp <= 0) {
+      player.hp = 0;
+      state.gameState = 'defeated';
+      state.innerPhase = null;
+      resetInput();
+      transientNotice = { text: '', until: 0 };
+      projectiles = [];
+      clearCombatFeedback();
+    }
+    return true;
+  }
+
   function useHarvestSlash() {
     if (state.gameState !== 'battle' || !enemy.alive) return;
     if (player.skillCooldown > 0) return showBattleNotice('스킬 재사용 대기 중입니다.');
@@ -914,6 +957,8 @@
     player.knownMagic = [];
     resetPlayerForBattle();
     clearCombatFeedback();
+    enemy.windupTimer = 0;
+    enemy.pendingAttack = false;
     spawnEnemy();
   }
 
@@ -949,7 +994,10 @@
     player.attackCooldown -= dt; player.dashCooldown -= dt;
     player.skillCooldown = Math.max(0, player.skillCooldown - dt);
     player.magicCooldown = Math.max(0, player.magicCooldown - dt);
+    player.invincibleTimer = Math.max(0, player.invincibleTimer - dt);
+    player.hurtTimer = Math.max(0, player.hurtTimer - dt);
     if (enemy.hurtTimer > 0) enemy.hurtTimer = Math.max(0, enemy.hurtTimer - dt);
+    if (enemy.windupTimer > 0) enemy.windupTimer = Math.max(0, enemy.windupTimer - dt);
     updateProjectiles(dt);
 
     if (enemy.alive && state.gameState === 'battle') {
@@ -971,17 +1019,20 @@
       }
       enemy.x = Math.max(0, Math.min(canvas.width - enemy.w, enemy.x));
       const yDiff = Math.abs(player.y - enemy.y);
-      if (Math.abs(player.x - enemy.x) < range && yDiff < 70 && enemy.attackCd <= 0) {
-        player.hp -= enemy.atk;
+      const inRange = Math.abs(player.x - enemy.x) < range && yDiff < 70;
+      if (inRange && enemy.attackCd <= 0 && enemy.windupTimer <= 0 && !enemy.pendingAttack) {
+        enemy.pendingAttack = true;
+        enemy.windupTimer = 0.25;
         enemy.attackCd = enemy.attackCooldownBase || 1;
       }
-    }
-    if (player.hp <= 0) {
-      player.hp = 0;
-      state.gameState = 'defeated';
-      state.innerPhase = null;
-      resetInput();
-      transientNotice = { text: '', until: 0 };
+      if (enemy.pendingAttack && enemy.windupTimer <= 0) {
+        const stillInRange = Math.abs(player.x - enemy.x) < range && Math.abs(player.y - enemy.y) < 70;
+        if (stillInRange) {
+          const knockback = player.x >= enemy.x ? 28 : -28;
+          applyPlayerDamage(enemy.atk, knockback);
+        }
+        enemy.pendingAttack = false;
+      }
     }
   }
 
@@ -996,9 +1047,12 @@
     }
     ctx.fillStyle = '#1e2f45'; ctx.fillRect(0,330,canvas.width,30);
     renderProjectiles();
-    ctx.fillStyle = '#6be675'; ctx.fillRect(player.x, player.y, player.w, player.h);
+    const playerHitFlash = player.hurtTimer > 0 || player.invincibleTimer > 0;
+    const flashOn = Math.floor(Date.now() / 80) % 2 === 0;
+    ctx.fillStyle = playerHitFlash ? (flashOn ? '#d8ff9b' : '#f3fff8') : '#6be675';
+    ctx.fillRect(player.x, player.y, player.w, player.h);
     if (enemy.alive) {
-      const enemyColor = enemy.hurtTimer > 0 ? '#ffd6d6' : (enemy.color || '#ff6b6b');
+      const enemyColor = enemy.windupTimer > 0 ? '#ffb347' : (enemy.hurtTimer > 0 ? '#ffd6d6' : (enemy.color || '#ff6b6b'));
       ctx.fillStyle = enemyColor;
       if (enemy.typeId === 'slime') {
         ctx.beginPath();
@@ -1034,6 +1088,11 @@
       ctx.fillStyle = '#ffffff';
       ctx.font = '12px sans-serif';
       ctx.fillText(enemy.name || '', enemy.x, Math.max(14, enemy.y - 4));
+      if (enemy.windupTimer > 0) {
+        ctx.fillStyle = '#ffe066';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText('!', enemy.x + enemy.w / 2 - 3, Math.max(12, enemy.y - 12));
+      }
     }
     if (keys.skill) { ctx.fillStyle='#ffe066'; ctx.fillRect(10,10,20,20); }
     if (keys.magic) { ctx.fillStyle='#a29bfe'; ctx.fillRect(40,10,20,20); }
@@ -1353,6 +1412,52 @@
       results.loadInvalidSaveFailsSafely = invalidJsonFail && invalidShapeFail && JSON.stringify(beforeInvalid) === JSON.stringify(afterInvalid);
 
 
+
+      state.gameState = 'battle'; state.innerPhase = null; player.hp = 30; player.invincibleTimer = 0; player.hurtTimer = 0;
+      const hpBeforePlayerDamage = player.hp;
+      results.applyPlayerDamageReducesHp = applyPlayerDamage(5, 0) && player.hp === hpBeforePlayerDamage - 5;
+
+      const hpBeforeBlocked = player.hp;
+      const blocked = applyPlayerDamage(5, 0) === false;
+      results.playerInvincibilityBlocksRepeatDamage = blocked && player.hp === hpBeforeBlocked;
+      results.playerDamageSetsHurtTimer = player.hurtTimer > 0;
+
+      player.invincibleTimer = 0;
+      player.x = 2;
+      applyPlayerDamage(1, -200);
+      results.playerDamageKnockbackClamps = player.x >= 0;
+
+      state.gameState = 'battle'; state.innerPhase = null; player.hp = 1; player.invincibleTimer = 0;
+      applyPlayerDamage(5, 0);
+      results.playerDamageCanDefeat = state.gameState === 'defeated' && player.hp === 0;
+
+      state.gameState = 'battle'; state.innerPhase = null; enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
+      enemy.x = player.x + 20; enemy.y = player.y; enemy.attackCd = 0; enemy.windupTimer = 0; enemy.pendingAttack = false;
+      const hpBeforeWindup = player.hp;
+      updateBattle(0.016);
+      const windupStarted = enemy.pendingAttack || enemy.windupTimer > 0;
+      const noInstantDamage = player.hp === hpBeforeWindup;
+      updateBattle(0.3);
+      results.enemyAttackUsesWindup = windupStarted && noInstantDamage && player.hp < hpBeforeWindup;
+
+      state.gameState = 'battle'; enemy.alive = true; player.hp = 40; player.invincibleTimer = 0;
+      enemy.x = player.x + 20; enemy.y = player.y; enemy.attackCd = 0; enemy.windupTimer = 0; enemy.pendingAttack = false;
+      updateBattle(0.016);
+      player.x = canvas.width - player.w;
+      const hpBeforeMiss = player.hp;
+      updateBattle(0.3);
+      results.enemyAttackMissesIfOutOfRangeAfterWindup = player.hp === hpBeforeMiss;
+
+      state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor';
+      player.invincibleTimer = 0.5; player.hurtTimer = 0.5; enemy.windupTimer = 0.5; enemy.pendingAttack = true;
+      goNextFloor();
+      results.playerHitStateClearsOnNextFloor = player.invincibleTimer === 0 && player.hurtTimer === 0 && enemy.windupTimer === 0 && enemy.pendingAttack === false;
+
+      player.invincibleTimer = 0.5; player.hurtTimer = 0.5; enemy.windupTimer = 0.5; enemy.pendingAttack = true;
+      const hitStateData = serializeGameState();
+      applySerializedGameState(hitStateData);
+      results.loadClearsPlayerHitState = player.invincibleTimer === 0 && player.hurtTimer === 0 && enemy.windupTimer === 0 && enemy.pendingAttack === false;
+
       state.gameState = 'battle'; enemy.alive = true; enemy.hp = 20; enemy.hurtTimer = 0; clearCombatFeedback();
       applyEnemyDamage(5, 0, 'test');
       results.applyEnemyDamageReducesHp = enemy.hp === 15;
@@ -1540,11 +1645,15 @@
       transientNotice.text === backupTransientNotice.text && transientNotice.until === backupTransientNotice.until &&
       JSON.stringify(keys) === JSON.stringify(backupKeys) && JSON.stringify(projectiles) === JSON.stringify(backupProjectiles) &&
       hitStopTimer === backupHitStopTimer && screenShakeTimer === backupScreenShakeTimer && screenShakeMagnitude === backupScreenShakeMagnitude &&
-      enemy.hurtTimer === (typeof backupEnemy.hurtTimer === 'number' ? backupEnemy.hurtTimer : 0);
+      enemy.hurtTimer === (typeof backupEnemy.hurtTimer === 'number' ? backupEnemy.hurtTimer : 0) &&
+      player.invincibleTimer === (typeof backupPlayer.invincibleTimer === 'number' ? backupPlayer.invincibleTimer : 0) &&
+      player.hurtTimer === (typeof backupPlayer.hurtTimer === 'number' ? backupPlayer.hurtTimer : 0) &&
+      enemy.windupTimer === (typeof backupEnemy.windupTimer === 'number' ? backupEnemy.windupTimer : 0) &&
+      enemy.pendingAttack === (!!backupEnemy.pendingAttack);
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY };
+  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
