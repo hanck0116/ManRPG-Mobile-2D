@@ -22,6 +22,7 @@
     자기상환배수: 1,
     statAllocationBase: null,
     itemUseMessage: '',
+    shopMessage: '',
   };
 
   const player = {
@@ -100,6 +101,7 @@
     state.gameState = 'battle';
     state.innerPhase = null;
     state.itemUseMessage = '';
+    state.shopMessage = '';
     resetInput();
     resetRewardState();
     syncVitals();
@@ -184,6 +186,64 @@
 
     state.itemUseMessage = '사용할 수 없는 아이템입니다.';
     return false;
+  }
+
+
+  function getItemSellPrice(item) {
+    const sellPriceMap = {
+      '외공서': 5,
+      '내공서': 5,
+      '검기': 12,
+      '멀티캐스팅의 서': 10,
+      '스킬 초기화권': 5,
+      '스탯 초기화권': 5,
+      '기초 마법서': 3,
+      '중급 마법서': 5,
+      '고급 마법서': 8,
+      '마도서': 15,
+      '리롤권': 2,
+    };
+    return sellPriceMap[item] || 0;
+  }
+
+  function getShopItems() {
+    return [
+      { name: '리롤권', price: 5 },
+      { name: '기초 마법서', price: 3 },
+      { name: '중급 마법서', price: 9 },
+      { name: '고급 마법서', price: 27 },
+      { name: '멀티캐스팅의 서', price: 12 },
+      { name: '외공서', price: 10 },
+      { name: '내공서', price: 10 },
+      { name: '검기', price: 30 },
+      { name: '스킬 초기화권', price: 10 },
+      { name: '스탯 초기화권', price: 10 },
+    ];
+  }
+
+  function buyShopItem(name) {
+    const shopItem = getShopItems().find(item => item.name === name);
+    if (!shopItem) return false;
+    if (player.coin < shopItem.price) {
+      state.shopMessage = '코인이 부족합니다.';
+      return false;
+    }
+    player.coin -= shopItem.price;
+    player.inventory.push(name);
+    state.shopMessage = `${name} 구매 완료`;
+    return true;
+  }
+
+  function sellInventoryItem(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= player.inventory.length) return false;
+    const item = player.inventory[index];
+    const sellPrice = getItemSellPrice(item);
+    if (sellPrice <= 0) return false;
+    const removed = removeInventoryAt(index);
+    if (removed === null) return false;
+    player.coin += sellPrice;
+    state.shopMessage = `${item} 판매 완료: +${sellPrice}코인`;
+    return true;
   }
 
   function computeDerived() {
@@ -308,6 +368,7 @@
 
   function enterInnerWorld() {
     state.itemUseMessage = '';
+    state.shopMessage = '';
     state.gameState = 'innerWorld';
     state.innerPhase = 'clearReset';
     resetInput();
@@ -318,6 +379,7 @@
 
   function goNextFloor() {
     state.itemUseMessage = '';
+    state.shopMessage = '';
     state.floor += 1;
     state.gameState = 'battle';
     state.innerPhase = null;
@@ -482,8 +544,25 @@
       phasePanel.querySelectorAll('.use-item').forEach(btn => btn.onclick = () => { useInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
       document.getElementById('goShop').onclick = () => { state.itemUseMessage = ''; state.innerPhase='shop'; };
     } else if (p === 'shop') {
-      phasePanel.innerHTML = '<div>7) shop</div><button id="skipShop">상점 건너뛰기</button>';
-      document.getElementById('skipShop').onclick = () => state.innerPhase='nextFloor';
+      const shopItems = getShopItems();
+      const shopMessage = state.shopMessage ? `<div class="stat-message">${state.shopMessage}</div>` : '';
+      const buyRows = shopItems.map((item) => {
+        const canBuy = player.coin >= item.price;
+        return `<div class="stat-row"><span>${item.name} (${item.price}코인)</span><div><button class="shop-buy" data-name="${item.name}" ${canBuy ? '' : 'disabled'}>구매</button></div></div>`;
+      }).join('');
+      const sellRows = player.inventory.length
+        ? player.inventory.map((item, i) => {
+          const sellPrice = getItemSellPrice(item);
+          if (sellPrice <= 0) {
+            return `<div class="stat-row"><span>${item} (판매 불가)</span><div><button disabled>판매 불가</button></div></div>`;
+          }
+          return `<div class="stat-row"><span>${item} (${sellPrice}코인)</span><div><button class="shop-sell" data-idx="${i}">판매</button></div></div>`;
+        }).join('')
+        : '<div>판매 가능한 아이템이 없습니다.</div>';
+      phasePanel.innerHTML = `<div>7) shop</div><div>현재 코인: ${player.coin}</div><div>보유 인벤토리 수: ${player.inventory.length}</div>${shopMessage}<div class="stat-message">구매 목록</div><div class="stat-grid">${buyRows}</div><div class="stat-message">인벤토리 판매 목록</div><div class="stat-grid">${sellRows}</div><button id="closeShop">상점 종료 / 다음 층 준비</button>`;
+      phasePanel.querySelectorAll('.shop-buy').forEach(btn => btn.onclick = () => { buyShopItem(btn.dataset.name); renderPhasePanel(); });
+      phasePanel.querySelectorAll('.shop-sell').forEach(btn => btn.onclick = () => { sellInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
+      document.getElementById('closeShop').onclick = () => { state.shopMessage = ''; state.innerPhase = 'nextFloor'; };
     } else if (p === 'nextFloor') {
       phasePanel.innerHTML = '<div>8) nextFloor</div><button id="goNext">다음 층 진입</button>';
       document.getElementById('goNext').onclick = goNextFloor;
@@ -506,6 +585,7 @@
     transientNotice = { text: '', until: 0 };
     state.statAllocationBase = null;
     state.itemUseMessage = '';
+    state.shopMessage = '';
     state.statusEffects = [];
     state.원영사용됨 = false;
     state.정령왕사용됨 = false;
@@ -617,6 +697,7 @@
       statusEffects: JSON.parse(JSON.stringify(state.statusEffects)),
       statAllocationBase: state.statAllocationBase ? JSON.parse(JSON.stringify(state.statAllocationBase)) : null,
       itemUseMessage: state.itemUseMessage,
+      shopMessage: state.shopMessage,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
@@ -780,6 +861,41 @@
       const skillResetUsed = useInventoryItem(idx);
       results.skillResetTicketNotConsumed = !skillResetUsed && player.inventory[idx] === '스킬 초기화권';
 
+      player.coin = 10;
+      player.inventory = [];
+      const coinBeforeBuy = player.coin;
+      const buyBasicMagic = buyShopItem('기초 마법서');
+      results.shopBuyItemConsumesCoin = buyBasicMagic && player.coin === coinBeforeBuy - 3 && player.inventory.includes('기초 마법서');
+
+      player.coin = 0;
+      player.inventory = [];
+      const noCoinBeforeBuy = player.coin;
+      const buySwordAuraFail = buyShopItem('검기');
+      results.shopBuyFailsWithoutCoin = !buySwordAuraFail && player.coin === noCoinBeforeBuy && !player.inventory.includes('검기');
+
+      player.coin = 0;
+      player.inventory = ['외공서'];
+      const sellCoinBefore = player.coin;
+      const sellOuterResult = sellInventoryItem(0);
+      results.shopSellItemAddsCoin = sellOuterResult && player.coin === sellCoinBefore + 5;
+
+      player.coin = 0;
+      player.inventory = ['외공서', '외공서'];
+      sellInventoryItem(0);
+      const outerCount = player.inventory.filter(item => item === '외공서').length;
+      results.shopSellRemovesOneItem = outerCount === 1;
+
+      player.coin = 0;
+      player.inventory = ['알 수 없는 아이템'];
+      const unknownSell = sellInventoryItem(0);
+      results.unknownItemSellFails = !unknownSell && player.inventory.length === 1 && player.inventory[0] === '알 수 없는 아이템';
+
+      state.innerPhase = 'shop';
+      state.shopMessage = '테스트';
+      state.shopMessage = '';
+      state.innerPhase = 'nextFloor';
+      results.shopExitAdvancesToNextFloor = state.innerPhase === 'nextFloor' && state.shopMessage === '';
+
     } finally {
       Object.assign(player, backupPlayer);
       Object.assign(enemy, backupEnemy);
@@ -792,6 +908,7 @@
       state.statusEffects = JSON.parse(JSON.stringify(backupState.statusEffects));
       state.statAllocationBase = backupState.statAllocationBase ? JSON.parse(JSON.stringify(backupState.statAllocationBase)) : null;
       state.itemUseMessage = backupState.itemUseMessage;
+      state.shopMessage = backupState.shopMessage;
       transientNotice = backupTransientNotice;
       resetInput();
       Object.assign(keys, backupKeys);
@@ -804,6 +921,7 @@
       JSON.stringify(state.rewardMeta) === JSON.stringify(backupState.rewardMeta) && JSON.stringify(state.statusEffects) === JSON.stringify(backupState.statusEffects) &&
       JSON.stringify(state.statAllocationBase) === JSON.stringify(backupState.statAllocationBase) &&
       state.itemUseMessage === backupState.itemUseMessage &&
+      state.shopMessage === backupState.shopMessage &&
       player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
       JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
       player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
@@ -815,7 +933,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, runDebugTests };
+  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, runDebugTests };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
