@@ -37,6 +37,20 @@ window.ManRPG.runDebugTests()
 - swordAuraMpModifierApplied
 - playerDeathToDefeatState
 - skillMagicButtonsSafe
+- nextFloorResetsPlayer
+- nextFloorClearsRewardState
+- nextFloorRestoresHpMp
+- enterInnerWorldDoesNotAutoClearOrLevel
+- defeatedStopsBattleInput
+- restartFromDefeatResetsRun
+
+## v0.1 안정화 2차 확인 항목
+- 다음 층 진입 시 HP/MP 최대 회복
+- 다음 층 진입 시 보상 선택 상태 초기화
+- 다음 층 진입 시 입력 상태 초기화
+- 패배 후 다시 시작 가능
+- runDebugTests() 신규 키 목록(위 6개)
+- 모바일에서 조작이 꼬이면 패배/재시작 또는 새로고침으로 복구 가능
 
 ## debugTestsRestoreState가 true여야 하는 이유
 `runDebugTests()`는 실제 플레이 상태를 오염시키면 안 됩니다.
