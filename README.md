@@ -88,3 +88,17 @@ window.ManRPG.runDebugTests()
 3. 상점
 4. 스킬/마법 1종씩 전투 적용
 5. 저장/불러오기
+
+## statAllocate 스탯 분배 v0.1
+
+- statAllocate 단계에서 남은 포인트를 사용해 힘/민첩/체력/지능/지혜/외모 6스탯을 직접 올릴 수 있습니다.
+- 각 스탯은 `+` 버튼으로 증가, `-` 버튼으로 감소할 수 있습니다.
+- `-` 버튼은 이번 statAllocate 단계에서 올린 수치만 되돌릴 수 있으며, 이전 기본 스탯 이하로는 내려가지 않습니다.
+- 스탯 최대치는 레벨 79 이하에서 `level + 20`, 레벨 80 이상에서는 `100`입니다.
+- v0.1 임시 처리로 스탯 증가 직후 HP/MP를 최대치로 맞춥니다.
+- `runDebugTests()` 신규 키 목록:
+  - `statIncreaseConsumesPoint`
+  - `statIncreaseRespectsMax`
+  - `statDecreaseOnlyAllocated`
+  - `statAllocateCompleteAdvancesPhase`
+  - `statAllocationBaseCleared`

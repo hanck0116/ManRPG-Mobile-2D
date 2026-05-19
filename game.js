@@ -20,6 +20,7 @@
     헤일로강화준비: false,
     빙백연혼사용됨: false,
     자기상환배수: 1,
+    statAllocationBase: null,
   };
 
   const player = {
@@ -45,6 +46,48 @@
   function spentStats() { return player.str+player.agi+player.vit+player.int+player.wis+player.looks; }
   function remainingPoints() { return totalStatPoints() - spentStats(); }
   function statMax() { return player.level < 80 ? player.level + 20 : 100; }
+
+
+  const statKeys = ['str', 'agi', 'vit', 'int', 'wis', 'looks'];
+
+  function ensureStatAllocationBase() {
+    if (state.statAllocationBase !== null) return;
+    state.statAllocationBase = {
+      str: player.str,
+      agi: player.agi,
+      vit: player.vit,
+      int: player.int,
+      wis: player.wis,
+      looks: player.looks,
+    };
+  }
+
+  function increaseStat(key) {
+    if (!statKeys.includes(key)) return;
+    if (remainingPoints() <= 0) return;
+    if (player[key] >= statMax()) return;
+    player[key] += 1;
+    syncVitals();
+    player.hp = derived.maxHp;
+    player.mp = derived.maxMp;
+  }
+
+  function decreaseStat(key) {
+    if (!statKeys.includes(key)) return;
+    if (!state.statAllocationBase) return;
+    const base = state.statAllocationBase[key];
+    if (typeof base !== 'number') return;
+    if (player[key] <= base) return;
+    player[key] -= 1;
+    syncVitals();
+    player.hp = Math.min(player.hp, derived.maxHp);
+    player.mp = Math.min(player.mp, derived.maxMp);
+  }
+
+  function finishStatAllocation() {
+    state.statAllocationBase = null;
+    state.innerPhase = 'skillTechMagicTrait';
+  }
 
   function computeDerived() {
     const maxHpBase = player.vit * 10;
@@ -172,6 +215,7 @@
     resetInput();
     resetRewardState();
     transientNotice = { text: '', until: 0 };
+    state.statAllocationBase = null;
   }
 
   function goNextFloor() {
@@ -181,6 +225,7 @@
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
+    state.statAllocationBase = null;
     resetPlayerForBattle();
     spawnEnemy();
   }
@@ -255,8 +300,45 @@
         state.innerPhase = 'statAllocate';
       };
     } else if (p === 'statAllocate') {
-      phasePanel.innerHTML = '<div>5) statAllocate</div><button id="skipStat">스탯 분배 건너뛰기</button>';
-      document.getElementById('skipStat').onclick = () => state.innerPhase='skillTechMagicTrait';
+      ensureStatAllocationBase();
+      const statLabels = [
+        ['str', '힘'],
+        ['agi', '민첩'],
+        ['vit', '체력'],
+        ['int', '지능'],
+        ['wis', '지혜'],
+        ['looks', '외모'],
+      ];
+      const canIncreaseAny = remainingPoints() > 0;
+      phasePanel.innerHTML = `<div>5) statAllocate</div>
+        <div>남은 포인트: ${remainingPoints()}</div>
+        <div>총 스탯 포인트: ${totalStatPoints()}</div>
+        <div>스탯 최대치: ${statMax()}</div>
+        ${statLabels.map(([key, label]) => {
+          const canIncrease = canIncreaseAny && player[key] < statMax();
+          const canDecrease = state.statAllocationBase && player[key] > state.statAllocationBase[key];
+          return `<div class="stat-row">
+            <span>${label}: ${player[key]}</span>
+            <div>
+              <button class="stat-plus" data-key="${key}" ${canIncrease ? '' : 'disabled'}>+${label}</button>
+              <button class="stat-minus" data-key="${key}" ${canDecrease ? '' : 'disabled'}>-${label}</button>
+            </div>
+          </div>`;
+        }).join('')}
+        <div>
+          <button id="finishStat">분배 완료</button>
+          <button id="skipStat">건너뛰기</button>
+        </div>`;
+      phasePanel.querySelectorAll('.stat-plus').forEach(btn => btn.onclick = () => {
+        increaseStat(btn.dataset.key);
+        renderPhasePanel();
+      });
+      phasePanel.querySelectorAll('.stat-minus').forEach(btn => btn.onclick = () => {
+        decreaseStat(btn.dataset.key);
+        renderPhasePanel();
+      });
+      document.getElementById('finishStat').onclick = finishStatAllocation;
+      document.getElementById('skipStat').onclick = finishStatAllocation;
     } else if (p === 'skillTechMagicTrait') {
       phasePanel.innerHTML = '<div>6) skillTechMagicTrait</div><button id="skipSTM">기술/마법서 처리 건너뛰기</button>';
       document.getElementById('skipSTM').onclick = () => state.innerPhase='shop';
@@ -283,6 +365,7 @@
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
+    state.statAllocationBase = null;
     state.statusEffects = [];
     state.원영사용됨 = false;
     state.정령왕사용됨 = false;
@@ -392,6 +475,7 @@
       rewardSelected: new Set([...state.rewardSelected]),
       rewardMeta: JSON.parse(JSON.stringify(state.rewardMeta)),
       statusEffects: JSON.parse(JSON.stringify(state.statusEffects)),
+      statAllocationBase: state.statAllocationBase ? JSON.parse(JSON.stringify(state.statAllocationBase)) : null,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
@@ -458,6 +542,47 @@
         player.outer === 0 && player.inner === 0 && player.swordAura === 0 && player.multicasting === 1 &&
         player.inventory.length === 0 && player.knownMagic.length === 0 &&
         player.hp === derived.maxHp && player.mp === derived.maxMp && enemy.alive;
+
+
+      state.gameState = 'innerWorld'; state.innerPhase = 'statAllocate';
+      state.statAllocationBase = null;
+      player.level = 10; player.str = 10; player.agi = 10; player.vit = 10; player.int = 10; player.wis = 10; player.looks = 10;
+      syncVitals();
+      ensureStatAllocationBase();
+      const beforeRemain = remainingPoints();
+      increaseStat('str');
+      results.statIncreaseConsumesPoint = remainingPoints() === beforeRemain - 1;
+
+      player.str = statMax();
+      const maxBefore = player.str;
+      increaseStat('str');
+      results.statIncreaseRespectsMax = player.str === maxBefore;
+
+      state.statAllocationBase = { str: 10, agi: 10, vit: 10, int: 10, wis: 10, looks: 10 };
+      player.str = 10;
+      decreaseStat('str');
+      const noDecreaseAtBase = player.str === 10;
+      player.str = 11;
+      decreaseStat('str');
+      const decreaseAllocated = player.str === 10;
+      results.statDecreaseOnlyAllocated = noDecreaseAtBase && decreaseAllocated;
+
+      state.innerPhase = 'statAllocate'; state.statAllocationBase = { str: 10, agi: 10, vit: 10, int: 10, wis: 10, looks: 10 };
+      finishStatAllocation();
+      results.statAllocateCompleteAdvancesPhase = state.innerPhase === 'skillTechMagicTrait';
+
+      state.statAllocationBase = { str: 1, agi: 1, vit: 1, int: 1, wis: 1, looks: 1 };
+      finishStatAllocation();
+      const clearedByFinish = state.statAllocationBase === null;
+      state.statAllocationBase = { str: 1, agi: 1, vit: 1, int: 1, wis: 1, looks: 1 };
+      state.floor = 1; state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor';
+      goNextFloor();
+      const clearedByNextFloor = state.statAllocationBase === null;
+      state.statAllocationBase = { str: 1, agi: 1, vit: 1, int: 1, wis: 1, looks: 1 };
+      state.gameState = 'defeated';
+      restartFromDefeat();
+      const clearedByRestart = state.statAllocationBase === null;
+      results.statAllocationBaseCleared = clearedByFinish && clearedByNextFloor && clearedByRestart;
     } finally {
       Object.assign(player, backupPlayer);
       Object.assign(enemy, backupEnemy);
@@ -468,6 +593,7 @@
       state.rewardSelected = new Set([...backupState.rewardSelected]);
       state.rewardMeta = JSON.parse(JSON.stringify(backupState.rewardMeta));
       state.statusEffects = JSON.parse(JSON.stringify(backupState.statusEffects));
+      state.statAllocationBase = backupState.statAllocationBase ? JSON.parse(JSON.stringify(backupState.statAllocationBase)) : null;
       transientNotice = backupTransientNotice;
       resetInput();
       Object.assign(keys, backupKeys);
@@ -478,6 +604,7 @@
       JSON.stringify(state.rewardCandidates) === JSON.stringify(backupState.rewardCandidates) &&
       JSON.stringify([...state.rewardSelected]) === JSON.stringify([...backupState.rewardSelected]) &&
       JSON.stringify(state.rewardMeta) === JSON.stringify(backupState.rewardMeta) && JSON.stringify(state.statusEffects) === JSON.stringify(backupState.statusEffects) &&
+      JSON.stringify(state.statAllocationBase) === JSON.stringify(backupState.statAllocationBase) &&
       player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
       JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
       player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
@@ -489,7 +616,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, runDebugTests };
+  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, increaseStat, decreaseStat, finishStatAllocation, runDebugTests };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
