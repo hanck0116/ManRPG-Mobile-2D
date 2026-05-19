@@ -7,7 +7,7 @@
   let transientNotice = { text: '', until: 0 };
 
   const state = {
-    gameState: 'battle',
+    gameState: 'initialStatAllocate',
     innerPhase: null,
     floor: 1,
     rewardCandidates: [],
@@ -21,6 +21,7 @@
     빙백연혼사용됨: false,
     자기상환배수: 1,
     statAllocationBase: null,
+    itemUseMessage: '',
   };
 
   const player = {
@@ -87,6 +88,102 @@
   function finishStatAllocation() {
     state.statAllocationBase = null;
     state.innerPhase = 'skillTechMagicTrait';
+  }
+
+  function finishInitialStatAllocation() {
+    if (remainingPoints() > 0) {
+      transientNotice = { text: `경고: 남은 포인트 ${remainingPoints()}로 전투를 시작합니다.`, until: Date.now() + 2000 };
+    } else {
+      transientNotice = { text: '', until: 0 };
+    }
+    state.statAllocationBase = null;
+    state.gameState = 'battle';
+    state.innerPhase = null;
+    state.itemUseMessage = '';
+    resetInput();
+    resetRewardState();
+    syncVitals();
+    player.hp = derived.maxHp;
+    player.mp = derived.maxMp;
+    spawnEnemy();
+  }
+
+  function applyRecommendedInitialStats() {
+    if (state.gameState !== 'initialStatAllocate') return;
+    ensureStatAllocationBase();
+    player.str = 16;
+    player.agi = 8;
+    player.vit = 21;
+    player.int = 5;
+    player.wis = 5;
+    player.looks = 5;
+    syncVitals();
+    player.hp = derived.maxHp;
+    player.mp = derived.maxMp;
+  }
+
+  function removeInventoryAt(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= player.inventory.length) return null;
+    const removed = player.inventory.splice(index, 1);
+    return removed.length ? removed[0] : null;
+  }
+
+  function useInventoryItem(index, options = {}) {
+    if (!Number.isInteger(index) || index < 0 || index >= player.inventory.length) return false;
+    const item = player.inventory[index];
+    const magicBooks = ['기초 마법서', '중급 마법서', '고급 마법서', '마도서'];
+
+    if (item === '외공서') {
+      player.outer += 1;
+      removeInventoryAt(index);
+      syncVitals();
+      player.hp = derived.maxHp;
+      state.itemUseMessage = '외공서 사용: 외공이 1 증가했습니다.';
+      return true;
+    }
+    if (item === '내공서') {
+      player.inner += 1;
+      removeInventoryAt(index);
+      syncVitals();
+      player.mp = derived.maxMp;
+      state.itemUseMessage = '내공서 사용: 내공이 1 증가했습니다.';
+      return true;
+    }
+    if (item === '검기') {
+      if (player.swordAura >= 6) {
+        state.itemUseMessage = '검기는 이미 최대 단계입니다.';
+        return false;
+      }
+      player.swordAura += 1;
+      removeInventoryAt(index);
+      syncVitals();
+      player.mp = Math.min(player.mp, derived.maxMp);
+      state.itemUseMessage = '검기 사용: 검기 단계가 상승했습니다.';
+      return true;
+    }
+    if (item === '멀티캐스팅의 서') {
+      player.multicasting += 1;
+      removeInventoryAt(index);
+      state.itemUseMessage = '멀티캐스팅의 서 사용: 멀티캐스팅이 1 증가했습니다.';
+      return true;
+    }
+    if (item === '스킬 초기화권') {
+      state.itemUseMessage = '스킬 초기화는 아직 미구현입니다.';
+      return false;
+    }
+    if (magicBooks.includes(item)) {
+      const result = tryLearnMagic(item, options);
+      if (result.ok) {
+        removeInventoryAt(index);
+        state.itemUseMessage = '마법서 습득 성공';
+        return true;
+      }
+      state.itemUseMessage = '마법서 습득 실패: 책은 사라지지 않습니다.';
+      return false;
+    }
+
+    state.itemUseMessage = '사용할 수 없는 아이템입니다.';
+    return false;
   }
 
   function computeDerived() {
@@ -210,6 +307,7 @@
   }
 
   function enterInnerWorld() {
+    state.itemUseMessage = '';
     state.gameState = 'innerWorld';
     state.innerPhase = 'clearReset';
     resetInput();
@@ -219,6 +317,7 @@
   }
 
   function goNextFloor() {
+    state.itemUseMessage = '';
     state.floor += 1;
     state.gameState = 'battle';
     state.innerPhase = null;
@@ -230,11 +329,12 @@
     spawnEnemy();
   }
 
-  function tryLearnMagic(book) {
+  function tryLearnMagic(book, options = {}) {
     const diffMap = {'기초 마법서':50,'중급 마법서':70,'고급 마법서':100,'마도서':100};
     const diff = diffMap[book];
     if (!diff) return { ok: false, reason: 'not_magic_book' };
-    const success = player.wis >= diff || (Math.floor(Math.random() * diff) + 1) < player.wis;
+    const roll = typeof options.forceRoll === 'number' ? options.forceRoll : (Math.floor(Math.random() * diff) + 1);
+    const success = player.wis >= diff || roll < player.wis;
     if (success && !player.knownMagic.includes(book)) player.knownMagic.push(book);
     return { ok: success, reason: success ? 'learned' : 'failed_retryable' };
   }
@@ -245,7 +345,7 @@
       <div><span class="tag">이름</span>: ${player.name}</div>
       <div><span class="tag">칭호</span>: ${player.title}</div>
       <div><span class="tag">만트라</span>: ${player.mantra}</div>
-      <div><span class="tag">현재 상태</span>: ${state.gameState === 'battle' ? '전투' : (state.gameState === 'innerWorld' ? '심상세계' : '패배')}</div>
+      <div><span class="tag">현재 상태</span>: ${state.gameState === 'battle' ? '전투' : (state.gameState === 'innerWorld' ? '심상세계' : (state.gameState === 'initialStatAllocate' ? '초기 스탯 분배' : '패배'))}</div>
       <hr />
       <div>층: ${state.floor} | 레벨: ${player.level} | 코인: ${player.coin}</div>
       <div>남은 포인트: ${remainingPoints()} (총 ${totalStatPoints()}, 최대스탯 ${statMax()})</div>
@@ -258,12 +358,45 @@
       <div>최종 평타: ${derived.atk}</div>
       <div>외공/내공/검기/멀티캐스팅: ${player.outer}/${player.inner}/${player.swordAura}/${player.multicasting}</div>
       <div class="enemy">적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>
+      <div>인벤토리 수: ${player.inventory.length}</div>
       <div>인벤토리: ${player.inventory.length ? player.inventory.join(', ') : '없음'}</div>
     `;
   }
 
   function renderPhasePanel() {
     const notice = transientNotice.until > Date.now() ? `<div class="warn">${transientNotice.text}</div>` : '';
+    if (state.gameState === 'initialStatAllocate') {
+      ensureStatAllocationBase();
+      const statLabels = [
+        ['str', '힘'],
+        ['agi', '민첩'],
+        ['vit', '체력'],
+        ['int', '지능'],
+        ['wis', '지혜'],
+        ['looks', '외모'],
+      ];
+      const warning = remainingPoints() > 0 ? `<div class="warn">남은 포인트 ${remainingPoints()}가 있습니다. 그대로 시작할 수 있습니다.</div>` : '';
+      phasePanel.innerHTML = `<div>초기 스탯 분배</div>
+        <div>1층 전투 시작 전, 시작 스탯 포인트를 분배하세요.</div>
+        <div>남은 포인트: ${remainingPoints()}</div>
+        <div>총 스탯 포인트: ${totalStatPoints()}</div>
+        <div>스탯 최대치: ${statMax()}</div>
+        <div class="stat-grid">${statLabels.map(([key, label]) => {
+          const canIncrease = remainingPoints() > 0 && player[key] < statMax();
+          const canDecrease = state.statAllocationBase && player[key] > state.statAllocationBase[key];
+          return `<div class="stat-row"><span>${label}: ${player[key]}</span><div><button class="stat-plus" data-key="${key}" ${canIncrease ? '' : 'disabled'}>+${label}</button><button class="stat-minus" data-key="${key}" ${canDecrease ? '' : 'disabled'}>-${label}</button></div></div>`;
+        }).join('')}</div>
+        ${warning}
+        <div class="stat-actions">
+          <button id="recommendedInitialStats">추천 분배</button>
+          <button id="startFloorOneBattle">1층 전투 시작</button>
+        </div>`;
+      phasePanel.querySelectorAll('.stat-plus').forEach(btn => btn.onclick = () => { increaseStat(btn.dataset.key); renderPhasePanel(); });
+      phasePanel.querySelectorAll('.stat-minus').forEach(btn => btn.onclick = () => { decreaseStat(btn.dataset.key); renderPhasePanel(); });
+      document.getElementById('recommendedInitialStats').onclick = () => { applyRecommendedInitialStats(); renderPhasePanel(); };
+      document.getElementById('startFloorOneBattle').onclick = finishInitialStatAllocation;
+      return;
+    }
     if (state.gameState === 'battle') {
       phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}`;
       return;
@@ -341,8 +474,13 @@
       document.getElementById('finishStat').onclick = finishStatAllocation;
       document.getElementById('skipStat').onclick = finishStatAllocation;
     } else if (p === 'skillTechMagicTrait') {
-      phasePanel.innerHTML = '<div>6) skillTechMagicTrait</div><button id="skipSTM">기술/마법서 처리 건너뛰기</button>';
-      document.getElementById('skipSTM').onclick = () => state.innerPhase='shop';
+      const inventoryRows = player.inventory.length
+        ? player.inventory.map((item, i) => `<div class="stat-row"><span>${item}</span><div><button class="use-item" data-idx="${i}">사용</button></div></div>`).join('')
+        : '<div>보유 아이템 없음</div>';
+      const msg = state.itemUseMessage ? `<div class="stat-message">${state.itemUseMessage}</div>` : '';
+      phasePanel.innerHTML = `<div>6) skillTechMagicTrait</div><div>보유 아이템을 사용하거나 다음 단계로 넘어갈 수 있습니다.</div>${msg}<div class="stat-grid">${inventoryRows}</div><button id="goShop">처리 완료 / 상점으로 이동</button>`;
+      phasePanel.querySelectorAll('.use-item').forEach(btn => btn.onclick = () => { useInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
+      document.getElementById('goShop').onclick = () => { state.itemUseMessage = ''; state.innerPhase='shop'; };
     } else if (p === 'shop') {
       phasePanel.innerHTML = '<div>7) shop</div><button id="skipShop">상점 건너뛰기</button>';
       document.getElementById('skipShop').onclick = () => state.innerPhase='nextFloor';
@@ -361,12 +499,13 @@
 
   function restartFromDefeat() {
     state.floor = 1;
-    state.gameState = 'battle';
+    state.gameState = 'initialStatAllocate';
     state.innerPhase = null;
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
     state.statAllocationBase = null;
+    state.itemUseMessage = '';
     state.statusEffects = [];
     state.원영사용됨 = false;
     state.정령왕사용됨 = false;
@@ -477,6 +616,7 @@
       rewardMeta: JSON.parse(JSON.stringify(state.rewardMeta)),
       statusEffects: JSON.parse(JSON.stringify(state.statusEffects)),
       statAllocationBase: state.statAllocationBase ? JSON.parse(JSON.stringify(state.statAllocationBase)) : null,
+      itemUseMessage: state.itemUseMessage,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
@@ -584,6 +724,62 @@
       restartFromDefeat();
       const clearedByRestart = state.statAllocationBase === null;
       results.statAllocationBaseCleared = clearedByFinish && clearedByNextFloor && clearedByRestart;
+
+      results.gameStartsAtInitialStatAllocate = state.gameState === 'initialStatAllocate';
+
+      applyRecommendedInitialStats();
+      const totalStats = player.str + player.agi + player.vit + player.int + player.wis + player.looks;
+      results.recommendedInitialStatsValid = totalStats === 60 &&
+        player.str <= statMax() && player.agi <= statMax() && player.vit <= statMax() && player.int <= statMax() && player.wis <= statMax() && player.looks <= statMax() &&
+        remainingPoints() === 0;
+
+      finishInitialStatAllocation();
+      results.finishInitialStatAllocationStartsBattle = state.gameState === 'battle' && player.hp === derived.maxHp && player.mp === derived.maxMp && enemy.alive;
+
+      restartFromDefeat();
+      results.restartFromDefeatReturnsToInitialStatAllocate = state.gameState === 'initialStatAllocate';
+
+      const outerBefore = player.outer;
+      player.inventory.push('외공서');
+      let idx = player.inventory.length - 1;
+      const outerUsed = useInventoryItem(idx);
+      results.useOuterBookIncreasesOuter = outerUsed && player.outer === outerBefore + 1 && !player.inventory.includes('외공서');
+
+      const innerBefore = player.inner;
+      player.inventory.push('내공서');
+      idx = player.inventory.length - 1;
+      const innerUsed = useInventoryItem(idx);
+      results.useInnerBookIncreasesInner = innerUsed && player.inner === innerBefore + 1 && !player.inventory.includes('내공서');
+
+      player.swordAura = 6;
+      player.inventory.push('검기');
+      idx = player.inventory.length - 1;
+      const swordUsed = useInventoryItem(idx);
+      results.useSwordAuraBookCapsAtSix = !swordUsed && player.swordAura === 6 && player.inventory[idx] === '검기';
+
+      const multiBefore = player.multicasting;
+      player.inventory.push('멀티캐스팅의 서');
+      idx = player.inventory.length - 1;
+      const multiUsed = useInventoryItem(idx);
+      results.useMulticastingBookIncreases = multiUsed && player.multicasting === multiBefore + 1 && !player.inventory.includes('멀티캐스팅의 서');
+
+      player.wis = 100;
+      player.inventory.push('기초 마법서');
+      idx = player.inventory.length - 1;
+      const magicSuccess = useInventoryItem(idx, { forceRoll: 1 });
+      results.useMagicBookSuccessRemovesBook = magicSuccess && !player.inventory.includes('기초 마법서') && player.knownMagic.includes('기초 마법서');
+
+      player.wis = 1;
+      player.inventory.push('중급 마법서');
+      idx = player.inventory.length - 1;
+      const magicFail = useInventoryItem(idx, { forceRoll: 70 });
+      results.useMagicBookFailureKeepsBook = !magicFail && player.inventory[idx] === '중급 마법서';
+
+      player.inventory.push('스킬 초기화권');
+      idx = player.inventory.length - 1;
+      const skillResetUsed = useInventoryItem(idx);
+      results.skillResetTicketNotConsumed = !skillResetUsed && player.inventory[idx] === '스킬 초기화권';
+
     } finally {
       Object.assign(player, backupPlayer);
       Object.assign(enemy, backupEnemy);
@@ -595,6 +791,7 @@
       state.rewardMeta = JSON.parse(JSON.stringify(backupState.rewardMeta));
       state.statusEffects = JSON.parse(JSON.stringify(backupState.statusEffects));
       state.statAllocationBase = backupState.statAllocationBase ? JSON.parse(JSON.stringify(backupState.statAllocationBase)) : null;
+      state.itemUseMessage = backupState.itemUseMessage;
       transientNotice = backupTransientNotice;
       resetInput();
       Object.assign(keys, backupKeys);
@@ -606,6 +803,7 @@
       JSON.stringify([...state.rewardSelected]) === JSON.stringify([...backupState.rewardSelected]) &&
       JSON.stringify(state.rewardMeta) === JSON.stringify(backupState.rewardMeta) && JSON.stringify(state.statusEffects) === JSON.stringify(backupState.statusEffects) &&
       JSON.stringify(state.statAllocationBase) === JSON.stringify(backupState.statAllocationBase) &&
+      state.itemUseMessage === backupState.itemUseMessage &&
       player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
       JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
       player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
@@ -617,7 +815,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, runDebugTests };
+  window.ManRPG = { state, player, enemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, runDebugTests };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);

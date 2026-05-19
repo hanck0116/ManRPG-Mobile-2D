@@ -102,3 +102,42 @@ window.ManRPG.runDebugTests()
   - `statDecreaseOnlyAllocated`
   - `statAllocateCompleteAdvancesPhase`
   - `statAllocationBaseCleared`
+
+## 초기 스탯 분배 v0.1
+
+- 게임 시작 전 54포인트를 분배할 수 있음
+- 추천 분배 버튼 제공
+- 추천 분배값:
+  - 힘 16
+  - 민첩 8
+  - 체력 21
+  - 지능 5
+  - 지혜 5
+  - 외모 5
+- 추천 분배는 1층 생존을 위한 임시 기본값
+- 초기 분배 완료 후 1층 전투가 시작됨
+
+## skillTechMagicTrait 아이템 사용 v0.1
+
+- 외공서 사용 시 외공 증가
+- 내공서 사용 시 내공 증가
+- 검기 사용 시 검기 단계 증가, 최대 6
+- 멀티캐스팅의 서 사용 시 멀티캐스팅 증가
+- 마법서 사용 시 습득 판정
+- 마법서 실패 시 책이 사라지지 않음
+- 스킬 초기화권은 아직 미구현이라 소모되지 않음
+- shop은 아직 건너뛰기 상태
+
+## runDebugTests() 신규 키 목록 (이번 작업)
+
+- gameStartsAtInitialStatAllocate
+- recommendedInitialStatsValid
+- finishInitialStatAllocationStartsBattle
+- restartFromDefeatReturnsToInitialStatAllocate
+- useOuterBookIncreasesOuter
+- useInnerBookIncreasesInner
+- useSwordAuraBookCapsAtSix
+- useMulticastingBookIncreases
+- useMagicBookSuccessRemovesBook
+- useMagicBookFailureKeepsBook
+- skillResetTicketNotConsumed
