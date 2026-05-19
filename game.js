@@ -4,6 +4,7 @@
   const hudEl = document.getElementById('hud');
   const phasePanel = document.getElementById('phasePanel');
   const controls = document.getElementById('controls');
+  let transientNotice = { text: '', until: 0 };
 
   const state = {
     gameState: 'battle',
@@ -50,7 +51,7 @@
     const maxMpBase = player.level * 5 + player.int * 10;
     const aura = auraTable[player.swordAura] || auraTable[0];
     const maxHp = Math.floor(maxHpBase * (1.4 ** player.outer));
-    const maxMp = Math.floor(maxMpBase * (1.2 ** player.inner));
+    const maxMp = Math.max(0, Math.floor((maxMpBase * (1.2 ** player.inner)) + aura.mp));
     const mpRegen = Math.floor((player.level + player.wis * 2) * (1.2 ** player.inner));
     const baseAtk = Math.floor((player.str + player.vit) / 10) + 2;
     const atk = Math.floor(baseAtk * aura.mult);
@@ -63,7 +64,7 @@
     derived = computeDerived();
     player.hp = Math.min(player.hp, derived.maxHp);
     player.mp = Math.min(player.mp, derived.maxMp);
-    if (player.hp <= 0) player.hp = 1;
+    player.hp = Math.max(0, player.hp);
   }
 
   function spawnEnemy() {
@@ -168,13 +169,14 @@
       <div><span class="tag">이름</span>: ${player.name}</div>
       <div><span class="tag">칭호</span>: ${player.title}</div>
       <div><span class="tag">만트라</span>: ${player.mantra}</div>
-      <div><span class="tag">현재 상태</span>: ${state.gameState === 'battle' ? '전투' : '심상세계'}</div>
+      <div><span class="tag">현재 상태</span>: ${state.gameState === 'battle' ? '전투' : (state.gameState === 'innerWorld' ? '심상세계' : '패배')}</div>
       <hr />
       <div>층: ${state.floor} | 레벨: ${player.level} | 코인: ${player.coin}</div>
       <div>남은 포인트: ${remainingPoints()} (총 ${totalStatPoints()}, 최대스탯 ${statMax()})</div>
       <div>힘/민첩/체력/지능/지혜/외모: ${player.str}/${player.agi}/${player.vit}/${player.int}/${player.wis}/${player.looks}</div>
       <div>HP: ${Math.floor(player.hp)} / ${derived.maxHp}</div>
       <div>MP: ${Math.floor(player.mp)} / ${derived.maxMp}</div>
+      <div>검기 MP 보정: ${derived.auraMpMod >= 0 ? '+' : ''}${derived.auraMpMod}</div>
       <div>MP 회복량: ${derived.mpRegen}</div>
       <div>기본 평타: ${derived.baseAtk}</div>
       <div>최종 평타: ${derived.atk}</div>
@@ -185,8 +187,14 @@
   }
 
   function renderPhasePanel() {
+    const notice = transientNotice.until > Date.now() ? `<div class="warn">${transientNotice.text}</div>` : '';
     if (state.gameState === 'battle') {
-      phasePanel.innerHTML = '<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div>';
+      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>${notice}`;
+      return;
+    }
+    if (state.gameState === 'defeated') {
+      phasePanel.innerHTML = '<div class="enemy">패배: HP가 0이 되어 전투에서 쓰러졌습니다.</div><button id="restartRun">처음부터 다시 시작</button>';
+      document.getElementById('restartRun').onclick = restartFromDefeat;
       return;
     }
     const p = state.innerPhase;
@@ -232,7 +240,42 @@
 
   function rectHit(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
 
+  function showBattleNotice(text) {
+    if (state.gameState !== 'battle') return;
+    transientNotice = { text, until: Date.now() + 1500 };
+  }
+
+  function restartFromDefeat() {
+    state.floor = 1;
+    state.gameState = 'battle';
+    state.innerPhase = null;
+    state.rewardCandidates = [];
+    state.rewardSelected = new Set();
+    state.rewardMeta = { candidateCount: 2, pickCount: 1 };
+    state.statusEffects = [];
+    state.원영사용됨 = false;
+    state.정령왕사용됨 = false;
+    state.헤일로사용됨 = false;
+    state.헤일로강화준비 = false;
+    state.빙백연혼사용됨 = false;
+    state.자기상환배수 = 1;
+    player.level = 1;
+    player.coin = 0;
+    player.str = 1; player.agi = 1; player.vit = 1; player.int = 1; player.wis = 1; player.looks = 1;
+    player.outer = 0; player.inner = 0; player.swordAura = 0; player.multicasting = 1;
+    player.inventory = [];
+    player.knownMagic = [];
+    player.x = 150; player.y = 280; player.vx = 0; player.vy = 0;
+    player.attackCooldown = 0; player.dashCooldown = 0; player.facing = 1;
+    syncVitals();
+    player.hp = derived.maxHp;
+    player.mp = derived.maxMp;
+    spawnEnemy();
+  }
+
   function updateBattle(dt) {
+    if (keys.skill) { showBattleNotice('스킬은 아직 미구현입니다.'); keys.skill = false; }
+    if (keys.magic) { showBattleNotice('마법은 아직 미구현입니다.'); keys.magic = false; }
     const speed = 230;
     if (keys.left) { player.vx = -speed; player.facing = -1; }
     else if (keys.right) { player.vx = speed; player.facing = 1; }
@@ -265,6 +308,7 @@
       if (Math.abs(player.x - enemy.x) < 42 && enemy.attackCd <= 0) { player.hp -= enemy.atk; enemy.attackCd = 0.9; }
       if (enemy.hp <= 0) { enemy.alive = false; enterInnerWorld(); }
     }
+    if (player.hp <= 0) { player.hp = 0; state.gameState = 'defeated'; }
   }
 
   function renderCanvas() {
@@ -297,17 +341,28 @@
     const a = btn.dataset.action;
     const on = ev => { ev.preventDefault(); keys[a]=true; };
     const off = ev => { ev.preventDefault(); keys[a]=false; };
+    btn.addEventListener('pointerdown', on, { passive:false });
+    btn.addEventListener('pointerup', off, { passive:false });
+    btn.addEventListener('pointercancel', off, { passive:false });
+    btn.addEventListener('pointerleave', off, { passive:false });
     btn.addEventListener('touchstart', on, { passive:false });
     btn.addEventListener('touchend', off, { passive:false });
     btn.addEventListener('mousedown', on); btn.addEventListener('mouseup', off); btn.addEventListener('mouseleave', off);
   });
 
   function runDebugTests() {
-    const backup = {
-      state: JSON.parse(JSON.stringify({...state, rewardSelected:[...state.rewardSelected]})),
-      player: JSON.parse(JSON.stringify(player)),
-      enemy: JSON.parse(JSON.stringify(enemy)),
+    const backupState = {
+      gameState: state.gameState,
+      innerPhase: state.innerPhase,
+      floor: state.floor,
+      rewardCandidates: [...state.rewardCandidates],
+      rewardSelected: new Set([...state.rewardSelected]),
+      rewardMeta: JSON.parse(JSON.stringify(state.rewardMeta)),
+      statusEffects: JSON.parse(JSON.stringify(state.statusEffects)),
     };
+    const backupPlayer = JSON.parse(JSON.stringify(player));
+    const backupEnemy = JSON.parse(JSON.stringify(enemy));
+    const backupDerived = JSON.parse(JSON.stringify(derived));
     const results = {};
     try {
       const oldLooks = player.looks; player.looks = 1;
@@ -326,15 +381,42 @@
 
       state.floor = 1; state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor'; goNextFloor();
       results.nextFloorBackToBattle = state.gameState === 'battle' && state.floor === 2 && enemy.alive;
+
+      player.level = 1; player.int = 1; player.inner = 0; player.swordAura = 1; syncVitals();
+      results.swordAuraMpModifierApplied = derived.maxMp === 0;
+
+      state.gameState = 'battle'; player.hp = 1; enemy.attackCd = 0; enemy.atk = 10; enemy.alive = true; enemy.x = player.x;
+      updateBattle(0.016);
+      results.playerDeathToDefeatState = state.gameState === 'defeated' && player.hp === 0;
+
+      state.gameState = 'battle'; keys.skill = true; keys.magic = true;
+      updateBattle(0.016);
+      results.skillMagicButtonsSafe = transientNotice.text.length > 0 && state.gameState === 'battle';
     } finally {
-      Object.assign(player, backup.player);
-      Object.assign(enemy, backup.enemy);
-      Object.assign(state, backup.state);
-      state.rewardSelected = new Set(backup.state.rewardSelected || []);
-      syncVitals();
+      Object.assign(player, backupPlayer);
+      Object.assign(enemy, backupEnemy);
+      state.gameState = backupState.gameState;
+      state.innerPhase = backupState.innerPhase;
+      state.floor = backupState.floor;
+      state.rewardCandidates = [...backupState.rewardCandidates];
+      state.rewardSelected = new Set([...backupState.rewardSelected]);
+      state.rewardMeta = JSON.parse(JSON.stringify(backupState.rewardMeta));
+      state.statusEffects = JSON.parse(JSON.stringify(backupState.statusEffects));
+      keys.skill = false;
+      keys.magic = false;
+      derived = computeDerived();
     }
     results.debugTestsRestoreState =
-      player.level === backup.player.level && state.gameState === backup.state.gameState && enemy.hp === backup.enemy.hp;
+      state.gameState === backupState.gameState && state.innerPhase === backupState.innerPhase && state.floor === backupState.floor &&
+      JSON.stringify(state.rewardCandidates) === JSON.stringify(backupState.rewardCandidates) &&
+      JSON.stringify([...state.rewardSelected]) === JSON.stringify([...backupState.rewardSelected]) &&
+      JSON.stringify(state.rewardMeta) === JSON.stringify(backupState.rewardMeta) && JSON.stringify(state.statusEffects) === JSON.stringify(backupState.statusEffects) &&
+      player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
+      JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
+      player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
+      enemy.maxHp === backupEnemy.maxHp && enemy.x === backupEnemy.x && enemy.y === backupEnemy.y &&
+      derived.maxHp === backupDerived.maxHp && derived.maxMp === backupDerived.maxMp && derived.mpRegen === backupDerived.mpRegen &&
+      derived.baseAtk === backupDerived.baseAtk && derived.atk === backupDerived.atk;
     return results;
   }
 

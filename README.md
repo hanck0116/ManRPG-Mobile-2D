@@ -3,40 +3,30 @@
 이 프로젝트는 **모바일 브라우저용 ManRPG 2D 액션 프로토타입**입니다.
 빌드 도구 없이 `index.html` + `style.css` + `game.js`만으로 동작하며 GitHub Pages에서 바로 실행됩니다.
 
-## GitHub Pages 실행 방법
-1. 저장소 루트에 현재 파일들이 있는지 확인합니다.
-2. GitHub 저장소 → **Settings** → **Pages**로 이동합니다.
-3. **Source**를 `Deploy from a branch`로 선택합니다.
-4. Branch를 `main`(또는 현재 브랜치) / `/ (root)`로 선택 후 Save 합니다.
-5. 발급된 Pages URL을 모바일 브라우저에서 열면 실행됩니다.
+## 모바일 GitHub 웹에서 Pages 켜는 방법
+1. GitHub 모바일 웹에서 저장소(`hanck0116/ManRPG-Mobile-2D`)를 엽니다.
+2. 상단 메뉴에서 **Settings**로 이동합니다.
+3. **Pages** 항목으로 이동합니다.
+4. **Build and deployment**에서 **Deploy from a branch**를 선택합니다.
+5. Branch를 `main`, 폴더를 `/ (root)`로 선택 후 저장합니다.
+6. 발급된 Pages URL을 모바일 브라우저에서 열어 실행합니다.
 
-## 모바일 조작법
-- 왼쪽: 왼쪽 이동
-- 오른쪽: 오른쪽 이동
-- 점프: 점프
-- 대시: 대시
-- 공격: 기본 공격
-- 스킬: 입력만 처리(미구현)
-- 마법: 입력만 처리(미구현)
+## Codex 웹에서 다음 작업 넣는 방법
+1. Codex 작업창에 저장소를 연 상태로 요청을 작성합니다.
+2. “기존 4개 파일 유지”, “외부 라이브러리 금지” 같은 제약을 함께 명시합니다.
+3. 완료 조건(예: `runDebugTests()` 모든 항목 true)을 체크리스트로 적습니다.
+4. 결과에 PR 번호, 수정 파일, 테스트 결과를 반드시 포함하도록 요청합니다.
 
-## 키보드 조작법
-- `A` / `ArrowLeft`: 왼쪽 이동
-- `D` / `ArrowRight`: 오른쪽 이동
-- `W` / `Space`: 점프
-- `Shift`: 대시
-- `J`: 기본 공격
-- `K`: 스킬 입력
-- `L`: 마법 입력
-
-## 디버그 테스트 실행
-개발자 콘솔에서 아래를 실행합니다.
+## 브라우저 콘솔 테스트 방법
+개발자 도구 콘솔에서 아래를 실행합니다.
 
 ```js
 window.ManRPG.runDebugTests()
 ```
 
-## 디버그 테스트 통과 확인
-반환 객체의 모든 키 값이 `true`인지 확인합니다.
+반환 객체의 모든 값이 `true`여야 합니다.
+
+## runDebugTests() 반환 키 목록
 - rewardConfigLooks1
 - attackFormulaDiv10
 - enemyKillToInnerWorld
@@ -44,6 +34,13 @@ window.ManRPG.runDebugTests()
 - rewardApplyInventory
 - nextFloorBackToBattle
 - debugTestsRestoreState
+- swordAuraMpModifierApplied
+- playerDeathToDefeatState
+- skillMagicButtonsSafe
+
+## debugTestsRestoreState가 true여야 하는 이유
+`runDebugTests()`는 실제 플레이 상태를 오염시키면 안 됩니다.
+즉, 테스트 실행 전/후의 상태(전투 상태, 보상 선택, 플레이어/적/파생 능력치)가 동일해야 디버그 테스트를 신뢰할 수 있습니다.
 
 ## 현재 구현된 기능
 - 2D 횡스크롤 전투 기본 루프
@@ -62,19 +59,18 @@ window.ManRPG.runDebugTests()
   - nextFloor
 - 외모 기반 보상 후보/선택 수 규칙
 - 코인 보상 및 인벤토리 반영
-- tryLearnMagic(book) 성공/실패(재시도 가능)
+- tryLearnMagic(book)
+- 패배(defeated) 및 처음부터 다시 시작
 
-## 아직 구현하지 않은 기능
-- 스킬/마법 실전 전투 효과
-- 실제 스탯 분배 UI 및 분배 반영
-- 기술/마법서 소비 상세 처리
-- 상점 구매/판매 로직
-- 다양한 적 종류/패턴
-- 정교한 피격/애니메이션/사운드
+## v0.1 현재 제한
+- 스킬/마법은 안내만 표시
+- 스탯 분배는 건너뛰기
+- 상점은 건너뛰기
+- 저장 기능 없음
 
-## 다음 개발 순서 제안
-1. statAllocate 실제 포인트 분배 UI 추가
-2. 상점 로직(판매가 규칙 반영) 추가
-3. 스킬/마법 전투 효과 최소 1종씩 추가
-4. 적 패턴 다양화(돌진/원거리 등)
-5. 저장/불러오기(localStorage) 추가
+## 다음 작업 순서
+1. 스탯 분배 UI
+2. 아이템 사용
+3. 상점
+4. 스킬/마법 1종씩 전투 적용
+5. 저장/불러오기
