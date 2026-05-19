@@ -171,3 +171,21 @@ window.ManRPG.runDebugTests()
   - `deleteSaveClearsStorage`
   - `loadMissingSaveFailsSafely`
   - `loadInvalidSaveFailsSafely`
+
+## 전투 스킬/마법 v0.1
+- K / 스킬 버튼: 수확 베기
+- L / 마법 버튼: 작은 화염구
+- 수확 베기는 MP 20 소모, 전방 넓은 범위 공격
+- 작은 화염구는 MP 15 소모, 전방 투사체
+- 이번 v0.1에서는 작은 화염구가 마법서 습득 여부와 관계없이 테스트용 기본 마법으로 사용 가능
+- 스킬/마법 쿨타임이 있음
+- runDebugTests 신규 키 목록:
+  - harvestSlashConsumesMp
+  - harvestSlashDamagesEnemy
+  - harvestSlashCooldownBlocksRepeat
+  - fireballConsumesMp
+  - fireballProjectileHitsEnemy
+  - skillFailsWithoutMp
+  - magicFailsWithoutMp
+  - projectilesClearOnNextFloor
+  - skillMagicCooldownSavedOrResetSafely
