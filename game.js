@@ -13,6 +13,7 @@
     rewardCandidates: [],
     rewardSelected: new Set(),
     rewardMeta: { candidateCount: 2, pickCount: 1 },
+    statAllocationBase: null,
     statusEffects: [],
     원영사용됨: false,
     정령왕사용됨: false,
@@ -142,16 +143,76 @@
     else player.inventory.push(name);
   }
 
+  function resetInput() {
+    keys.left = false;
+    keys.right = false;
+    keys.jump = false;
+    keys.dash = false;
+    keys.attack = false;
+    keys.skill = false;
+    keys.magic = false;
+  }
+
+  function resetRewardState() {
+    state.rewardCandidates = [];
+    state.rewardSelected = new Set();
+    state.rewardMeta = { candidateCount: 2, pickCount: 1 };
+  }
+
+  function resetPlayerForBattle() {
+    player.x = 150; player.y = 280; player.vx = 0; player.vy = 0;
+    player.attackCooldown = 0; player.dashCooldown = 0; player.facing = 1;
+    syncVitals();
+    player.hp = derived.maxHp;
+    player.mp = derived.maxMp;
+  }
+
   function enterInnerWorld() {
     state.gameState = 'innerWorld';
     state.innerPhase = 'clearReset';
+    state.statAllocationBase = null;
+    resetInput();
+    resetRewardState();
+    transientNotice = { text: '', until: 0 };
   }
 
   function goNextFloor() {
     state.floor += 1;
     state.gameState = 'battle';
     state.innerPhase = null;
+    state.statAllocationBase = null;
+    resetRewardState();
+    resetInput();
+    transientNotice = { text: '', until: 0 };
+    resetPlayerForBattle();
     spawnEnemy();
+  }
+
+  function ensureStatAllocationBase() {
+    if (state.statAllocationBase) return;
+    state.statAllocationBase = {
+      str: player.str, agi: player.agi, vit: player.vit,
+      int: player.int, wis: player.wis, looks: player.looks
+    };
+  }
+
+  function increaseStat(key) {
+    if (remainingPoints() <= 0) return false;
+    if (player[key] >= statMax()) return false;
+    player[key] += 1;
+    syncVitals();
+    player.hp = derived.maxHp;
+    player.mp = derived.maxMp;
+    return true;
+  }
+
+  function decreaseStat(key) {
+    if (!state.statAllocationBase) return false;
+    const minValue = Math.max(1, state.statAllocationBase[key]);
+    if (player[key] <= minValue) return false;
+    player[key] -= 1;
+    syncVitals();
+    return true;
   }
 
   function tryLearnMagic(book) {
@@ -224,8 +285,43 @@
         state.innerPhase = 'statAllocate';
       };
     } else if (p === 'statAllocate') {
-      phasePanel.innerHTML = '<div>5) statAllocate</div><button id="skipStat">스탯 분배 건너뛰기</button>';
-      document.getElementById('skipStat').onclick = () => state.innerPhase='skillTechMagicTrait';
+      ensureStatAllocationBase();
+      const statRows = [
+        { key:'str', label:'힘' },
+        { key:'agi', label:'민첩' },
+        { key:'vit', label:'체력' },
+        { key:'int', label:'지능' },
+        { key:'wis', label:'지혜' },
+        { key:'looks', label:'외모' },
+      ];
+      const remain = remainingPoints();
+      const max = statMax();
+      phasePanel.innerHTML = `<div>5) statAllocate</div>
+        <div>남은 포인트: ${remain} / 총 ${totalStatPoints()} / 최대스탯 ${max}</div>
+        ${statRows.map(({key,label}) => {
+          const plusDisabled = remain <= 0 || player[key] >= max;
+          const minusDisabled = !state.statAllocationBase || player[key] <= state.statAllocationBase[key];
+          return `<div class="stat-row"><span>${label}: ${player[key]}</span>
+            <button data-op="inc" data-key="${key}" ${plusDisabled ? 'disabled' : ''}>+${label}</button>
+            <button data-op="dec" data-key="${key}" ${minusDisabled ? 'disabled' : ''}>-${label}</button>
+          </div>`;
+        }).join('')}
+        <div><button id="finishStat">분배 완료</button></div>
+        <div><button id="skipStat">스탯 분배 건너뛰기</button></div>`;
+      phasePanel.querySelectorAll('button[data-op]').forEach(btn => btn.onclick = () => {
+        const key = btn.dataset.key;
+        if (btn.dataset.op === 'inc') increaseStat(key);
+        else decreaseStat(key);
+        renderPhasePanel();
+      });
+      document.getElementById('finishStat').onclick = () => {
+        state.statAllocationBase = null;
+        state.innerPhase='skillTechMagicTrait';
+      };
+      document.getElementById('skipStat').onclick = () => {
+        state.statAllocationBase = null;
+        state.innerPhase='skillTechMagicTrait';
+      };
     } else if (p === 'skillTechMagicTrait') {
       phasePanel.innerHTML = '<div>6) skillTechMagicTrait</div><button id="skipSTM">기술/마법서 처리 건너뛰기</button>';
       document.getElementById('skipSTM').onclick = () => state.innerPhase='shop';
@@ -249,9 +345,10 @@
     state.floor = 1;
     state.gameState = 'battle';
     state.innerPhase = null;
-    state.rewardCandidates = [];
-    state.rewardSelected = new Set();
-    state.rewardMeta = { candidateCount: 2, pickCount: 1 };
+    state.statAllocationBase = null;
+    resetRewardState();
+    resetInput();
+    transientNotice = { text: '', until: 0 };
     state.statusEffects = [];
     state.원영사용됨 = false;
     state.정령왕사용됨 = false;
@@ -265,11 +362,7 @@
     player.outer = 0; player.inner = 0; player.swordAura = 0; player.multicasting = 1;
     player.inventory = [];
     player.knownMagic = [];
-    player.x = 150; player.y = 280; player.vx = 0; player.vy = 0;
-    player.attackCooldown = 0; player.dashCooldown = 0; player.facing = 1;
-    syncVitals();
-    player.hp = derived.maxHp;
-    player.mp = derived.maxMp;
+    resetPlayerForBattle();
     spawnEnemy();
   }
 
@@ -308,7 +401,13 @@
       if (Math.abs(player.x - enemy.x) < 42 && enemy.attackCd <= 0) { player.hp -= enemy.atk; enemy.attackCd = 0.9; }
       if (enemy.hp <= 0) { enemy.alive = false; enterInnerWorld(); }
     }
-    if (player.hp <= 0) { player.hp = 0; state.gameState = 'defeated'; }
+    if (player.hp <= 0) {
+      player.hp = 0;
+      state.gameState = 'defeated';
+      state.innerPhase = null;
+      resetInput();
+      transientNotice = { text: '', until: 0 };
+    }
   }
 
   function renderCanvas() {
@@ -359,10 +458,13 @@
       rewardSelected: new Set([...state.rewardSelected]),
       rewardMeta: JSON.parse(JSON.stringify(state.rewardMeta)),
       statusEffects: JSON.parse(JSON.stringify(state.statusEffects)),
+      statAllocationBase: state.statAllocationBase ? JSON.parse(JSON.stringify(state.statAllocationBase)) : null,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
     const backupDerived = JSON.parse(JSON.stringify(derived));
+    const backupTransientNotice = JSON.parse(JSON.stringify(transientNotice));
+    const backupKeys = JSON.parse(JSON.stringify(keys));
     const results = {};
     try {
       const oldLooks = player.looks; player.looks = 1;
@@ -381,6 +483,15 @@
 
       state.floor = 1; state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor'; goNextFloor();
       results.nextFloorBackToBattle = state.gameState === 'battle' && state.floor === 2 && enemy.alive;
+      results.nextFloorResetsPlayer = player.x === 150 && player.y === 280 && player.vx === 0 && player.vy === 0 &&
+        player.attackCooldown === 0 && player.dashCooldown === 0 && player.facing === 1;
+      results.nextFloorClearsRewardState = state.rewardCandidates.length === 0 && state.rewardSelected.size === 0 &&
+        state.rewardMeta.candidateCount === 2 && state.rewardMeta.pickCount === 1;
+      results.nextFloorRestoresHpMp = player.hp === derived.maxHp && player.mp === derived.maxMp;
+
+      const levelBeforeInner = player.level;
+      enterInnerWorld();
+      results.enterInnerWorldDoesNotAutoClearOrLevel = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset' && player.level === levelBeforeInner;
 
       player.level = 1; player.int = 1; player.inner = 0; player.swordAura = 1; syncVitals();
       results.swordAuraMpModifierApplied = derived.maxMp === 0;
@@ -388,10 +499,63 @@
       state.gameState = 'battle'; player.hp = 1; enemy.attackCd = 0; enemy.atk = 10; enemy.alive = true; enemy.x = player.x;
       updateBattle(0.016);
       results.playerDeathToDefeatState = state.gameState === 'defeated' && player.hp === 0;
+      keys.left = true; keys.attack = true;
+      const xBeforeDefeated = player.x;
+      const enemyHpBeforeDefeated = enemy.hp;
+      updateBattle(0.016);
+      results.defeatedStopsBattleInput = player.x === xBeforeDefeated && enemy.hp === enemyHpBeforeDefeated && state.gameState === 'defeated';
 
       state.gameState = 'battle'; keys.skill = true; keys.magic = true;
       updateBattle(0.016);
       results.skillMagicButtonsSafe = transientNotice.text.length > 0 && state.gameState === 'battle';
+
+      player.level = 9; player.coin = 33; player.str = 7; player.agi = 6; player.vit = 5; player.int = 4; player.wis = 3; player.looks = 2;
+      player.outer = 2; player.inner = 1; player.swordAura = 3; player.multicasting = 4;
+      player.inventory = ['외공서']; player.knownMagic = ['기초 마법서'];
+      state.statusEffects = ['dummy']; state.floor = 5; state.gameState = 'defeated'; state.innerPhase = 'shop';
+      restartFromDefeat();
+      results.restartFromDefeatResetsRun =
+        state.floor === 1 && state.gameState === 'battle' && state.innerPhase === null &&
+        state.rewardCandidates.length === 0 && state.rewardSelected.size === 0 &&
+        state.rewardMeta.candidateCount === 2 && state.rewardMeta.pickCount === 1 &&
+        state.statusEffects.length === 0 && !state.원영사용됨 && !state.정령왕사용됨 &&
+        !state.헤일로사용됨 && !state.헤일로강화준비 && !state.빙백연혼사용됨 && state.자기상환배수 === 1 &&
+        player.level === 1 && player.coin === 0 &&
+        player.str === 1 && player.agi === 1 && player.vit === 1 && player.int === 1 && player.wis === 1 && player.looks === 1 &&
+        player.outer === 0 && player.inner === 0 && player.swordAura === 0 && player.multicasting === 1 &&
+        player.inventory.length === 0 && player.knownMagic.length === 0 &&
+        player.hp === derived.maxHp && player.mp === derived.maxMp && enemy.alive && state.statAllocationBase === null;
+
+      const beforeRemain = remainingPoints();
+      state.statAllocationBase = { str: player.str, agi: player.agi, vit: player.vit, int: player.int, wis: player.wis, looks: player.looks };
+      increaseStat('str');
+      results.statIncreaseConsumesPoint = remainingPoints() === beforeRemain - 1;
+
+      const oldStrForMax = player.str;
+      player.str = statMax();
+      const maxAttempt = increaseStat('str');
+      results.statIncreaseRespectsMax = maxAttempt === false && player.str === statMax();
+      player.str = oldStrForMax;
+      syncVitals();
+
+      const baseStr = player.str;
+      state.statAllocationBase = { str: baseStr, agi: player.agi, vit: player.vit, int: player.int, wis: player.wis, looks: player.looks };
+      const decWithoutInc = decreaseStat('str');
+      increaseStat('str');
+      const decAfterInc = decreaseStat('str');
+      results.statDecreaseOnlyAllocated = decWithoutInc === false && decAfterInc === true && player.str === baseStr;
+
+      state.innerPhase = 'statAllocate';
+      state.statAllocationBase = { str: player.str, agi: player.agi, vit: player.vit, int: player.int, wis: player.wis, looks: player.looks };
+      state.statAllocationBase = null;
+      state.innerPhase = 'skillTechMagicTrait';
+      results.statAllocateCompleteAdvancesPhase = state.innerPhase === 'skillTechMagicTrait';
+
+      state.innerPhase = 'nextFloor'; state.gameState = 'innerWorld'; state.statAllocationBase = { str:1,agi:1,vit:1,int:1,wis:1,looks:1 }; goNextFloor();
+      const clearedByNextFloor = state.statAllocationBase === null;
+      state.statAllocationBase = { str:1,agi:1,vit:1,int:1,wis:1,looks:1 }; state.gameState = 'defeated'; restartFromDefeat();
+      const clearedByRestart = state.statAllocationBase === null;
+      results.statAllocationBaseCleared = results.statAllocateCompleteAdvancesPhase && clearedByNextFloor && clearedByRestart;
     } finally {
       Object.assign(player, backupPlayer);
       Object.assign(enemy, backupEnemy);
@@ -402,8 +566,10 @@
       state.rewardSelected = new Set([...backupState.rewardSelected]);
       state.rewardMeta = JSON.parse(JSON.stringify(backupState.rewardMeta));
       state.statusEffects = JSON.parse(JSON.stringify(backupState.statusEffects));
-      keys.skill = false;
-      keys.magic = false;
+      state.statAllocationBase = backupState.statAllocationBase ? JSON.parse(JSON.stringify(backupState.statAllocationBase)) : null;
+      transientNotice = backupTransientNotice;
+      resetInput();
+      Object.assign(keys, backupKeys);
       derived = computeDerived();
     }
     results.debugTestsRestoreState =
@@ -411,12 +577,15 @@
       JSON.stringify(state.rewardCandidates) === JSON.stringify(backupState.rewardCandidates) &&
       JSON.stringify([...state.rewardSelected]) === JSON.stringify([...backupState.rewardSelected]) &&
       JSON.stringify(state.rewardMeta) === JSON.stringify(backupState.rewardMeta) && JSON.stringify(state.statusEffects) === JSON.stringify(backupState.statusEffects) &&
+      JSON.stringify(state.statAllocationBase) === JSON.stringify(backupState.statAllocationBase) &&
       player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
       JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
       player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
       enemy.maxHp === backupEnemy.maxHp && enemy.x === backupEnemy.x && enemy.y === backupEnemy.y &&
       derived.maxHp === backupDerived.maxHp && derived.maxMp === backupDerived.maxMp && derived.mpRegen === backupDerived.mpRegen &&
-      derived.baseAtk === backupDerived.baseAtk && derived.atk === backupDerived.atk;
+      derived.baseAtk === backupDerived.baseAtk && derived.atk === backupDerived.atk &&
+      transientNotice.text === backupTransientNotice.text && transientNotice.until === backupTransientNotice.until &&
+      JSON.stringify(keys) === JSON.stringify(backupKeys);
     return results;
   }
 

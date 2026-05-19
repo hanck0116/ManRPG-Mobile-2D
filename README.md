@@ -37,6 +37,33 @@ window.ManRPG.runDebugTests()
 - swordAuraMpModifierApplied
 - playerDeathToDefeatState
 - skillMagicButtonsSafe
+- nextFloorResetsPlayer
+- nextFloorClearsRewardState
+- nextFloorRestoresHpMp
+- enterInnerWorldDoesNotAutoClearOrLevel
+- defeatedStopsBattleInput
+- restartFromDefeatResetsRun
+- statIncreaseConsumesPoint
+- statIncreaseRespectsMax
+- statDecreaseOnlyAllocated
+- statAllocateCompleteAdvancesPhase
+- statAllocationBaseCleared
+
+## v0.1 안정화 2차 확인 항목
+- 다음 층 진입 시 HP/MP 최대 회복
+- 다음 층 진입 시 보상 선택 상태 초기화
+- 다음 층 진입 시 입력 상태 초기화
+- 패배 후 다시 시작 가능
+- runDebugTests() 신규 키 목록(위 6개)
+- 모바일에서 조작이 꼬이면 패배/재시작 또는 새로고침으로 복구 가능
+
+## statAllocate 스탯 분배 v0.1
+- `statAllocate` 단계에서 남은 포인트를 사용해 6스탯(힘/민첩/체력/지능/지혜/외모)을 올릴 수 있습니다.
+- 각 스탯은 `+` 버튼으로 증가, `-` 버튼으로 감소할 수 있습니다.
+- `-` 버튼은 **이번 statAllocate 단계에서 +로 올린 수치만** 되돌릴 수 있습니다(기준: `state.statAllocationBase`).
+- 스탯 최대치는 `level < 80`이면 `level + 20`, `level >= 80`이면 `100`입니다.
+- v0.1 임시 처리: 스탯 증가 시 파생 수치 즉시 반영을 위해 `HP/MP`를 현재 최대치(`derived.maxHp/maxMp`)로 맞춥니다.
+- 신규 runDebugTests 키: `statIncreaseConsumesPoint`, `statIncreaseRespectsMax`, `statDecreaseOnlyAllocated`, `statAllocateCompleteAdvancesPhase`, `statAllocationBaseCleared`
 
 ## debugTestsRestoreState가 true여야 하는 이유
 `runDebugTests()`는 실제 플레이 상태를 오염시키면 안 됩니다.
