@@ -78,3 +78,14 @@ body {
   .app { flex-direction: column; }
   .hud { width: 100%; min-width: 0; max-height: none; }
 }
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+.stat-row span { min-width: 90px; }
+.stat-row button { min-width: 84px; }
