@@ -379,3 +379,22 @@ window.ManRPG.runDebugTests()
   - innerWorldUsesOverlayCard
   - innerWorldHidesBattleEnemyEmphasis
   - systemMenuDoesNotCoverQuickSlots
+
+## 가로형 UI 최종 보강 v0.3
+- quickSlotTray 접힘 상태 가독성 개선(최소 폭/줄바꿈 방지/가로형 토글 텍스트)
+- battle notice 위치 보강(중앙 간섭 축소, 하단 소형 알림)
+- innerWorld controls 비활성 시각 처리(강한 dim + 비활성 포인터)
+- enemyBar 상태별 표시(battle 외 숨김)
+- systemMenu 겹침 방지(메뉴 열림 시 quickSlot 자동 접힘)
+- skillMagicOverlay와 quickSlotTray 동시 표시 방지
+- 새 runDebugTests 키 목록
+  - quickSlotCollapsedTextReadable
+  - quickSlotCollapsedDoesNotWrap
+  - quickSlotExpandedDoesNotOverlapControls
+  - battleNoticeDoesNotCoverActors
+  - innerWorldControlsAreDimmed
+  - innerWorldMenuButtonsUseGrid
+  - enemyBarHiddenOutsideBattle
+  - systemMenuClosesOnToggle
+  - systemMenuDoesNotOverlapQuickSlot
+  - skillMagicOverlayHidesQuickSlot
