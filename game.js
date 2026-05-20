@@ -27,6 +27,9 @@
     saveMessage: '',
     debugMessage: '',
     innerActionsDone: { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false },
+    floorClearResolved: false,
+    floorRewardClaimed: false,
+    pendingFloorClearResolve: false,
   };
 
   const player = {
@@ -39,7 +42,7 @@
     attackCooldown: 0, dashCooldown: 0, facing: 1,
     skillCooldown: 0, magicCooldown: 0,
     invincibleTimer: 0, hurtTimer: 0,
-    knownMagic: [], inventory: []
+    knownMagic: [], selectedMagicKey: '', inventory: []
   };
 
   let projectiles = [];
@@ -66,6 +69,24 @@
     0: { mult:1, mp:0 },1:{ mult:1.5, mp:-50 },2:{ mult:2, mp:-150 },3:{ mult:5, mp:-300 },
     4:{ mult:20, mp:-700 },5:{ mult:50, mp:-500 },6:{ mult:50, mp:1000000 }
   };
+
+
+  const SPELL_MP = {1:50,2:80,3:120,4:180,5:260,6:380,7:520,8:700,9:900};
+  const SPELL_BOOK_TIERS = {
+    '기초 마법서': { minCircle:1, maxCircle:2, difficulty:50 },
+    '중급 마법서': { minCircle:3, maxCircle:4, difficulty:70 },
+    '고급 마법서': { minCircle:5, maxCircle:6, difficulty:100 },
+    '마도서': { minCircle:7, maxCircle:9, difficulty:100 }
+  };
+  const SPELLS_BY_CIRCLE = {1:['라이트','파이어','아이스','윈드','매직 애로우','그리스','디그','다크니스'],2:['샤이닝 에로우','파이어 애로우','아이스 애로우','윈드 애로우','록 애로우','라이트닝 애로우','쉴드','힐','아이스 포그','다크 애로우'],3:['샤이닝 디펜스','파이어 볼','아이스 볼','윈드 커터','스톤 스파이크','라이데인','슬립','캔슬레이션','본 바인딩','다크 볼','웹','메모라이즈'],4:['샤이닝 웨이브','샤이닝 인첸트','샤이닝 블레스터','파이어 랜스','아이스 스피어','에어로 봄','어스 브레이크','블라인드','슬로우','사일런스','일루젼','컨퓨전'],5:['인비저빌리티','디스토션','샤이닝 필드','레이져','배리어','익스플로전','체인 라이트닝','파이어 월','블링크','그래비티','다크 필드','라이프 드레인'],6:['샤이닝 레이져','서먼 샤이닝','안티 매직 쉘','필라 오브 파이어','기가 라이데인','토네이도','디스펠','그레이트 쉴드','텔레포트','그레이트 힐','다크 캐논','서먼 본 와이번'],7:['샤이닝 저지먼트','헤븐스 도어','인페르노','블리자드','어스 퀘이크','윈드 스톰','워프','리플렉션','그래비티','서먼 데스나이트'],8:['소드 오브 리벤지 라이트','샤이닝 레인','볼케이노','아이스 크리스탈 오브 스톰','퓨리 오브 더 헤븐','라이트닝 인피니티','컨트롤 웨더','매스 텔레포트','헬파이어','서먼 본 드래곤'],9:['메테오 스트라이크','메테오 스웜','앱솔루트 제로 포인트','라이트닝 월드','루인 오브 그라운드','엘리멘탈 퍼니시먼트','앱솔루트 쉴드','워프 게이트','파워 워드 킬','네크로폴리스']};
+  function spellCategory(name){const n=name; if(/힐/.test(n))return 'heal'; if(/쉴드|디펜스|배리어|리플렉션/.test(n))return 'defense'; if(/서먼/.test(n))return 'summon'; if(/필드|웨이브|월|스톰|토네이도|볼케이노|메테오 스웜|네크로폴리스/.test(n))return 'area'; if(/볼|브레이크|퀘이크|크리스탈/.test(n))return 'smallArea'; if(/레이져|인피니티|저지먼트|퍼니시먼트|파워 워드 킬/.test(n))return 'singleHigh'; if(/라이트|슬립|캔슬레이션|블라인드|슬로우|사일런스|일루젼|컨퓨전|인비저빌리티|디스토션|블링크|디스펠|텔레포트|워프|컨트롤 웨더|워프 게이트|메모라이즈|그리스|디그|다크니스/.test(n))return 'utility'; return 'single';}
+  function spellPowerRatio(circle,cat){const base=0.18+circle*0.05; const m={utility:0.08,defense:0.12,heal:0.2,summon:0.35,area:0.28,smallArea:0.4,singleHigh:0.7,single:0.5}[cat]||0.5; return Math.min(0.95,base*m);}
+  function spellManaCost(circle,cat){const m={utility:0.8,defense:0.9,heal:0.9,summon:1.05,area:1.0,smallArea:1.0,singleHigh:1.1,single:1.0}[cat]||1; return Math.max(1,Math.floor(SPELL_MP[circle]*m));}
+  function spellPower(mp,circle,cat){return Math.max(0,Math.min(mp,Math.floor(mp*spellPowerRatio(circle,cat))));}
+  function makeSpellKey(circle,name){return `c${circle}_`+name.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').replace(/^_|_$/g,'');}
+  const MAGIC_POOL=[]; Object.keys(SPELLS_BY_CIRCLE).forEach((c)=>{const circle=Number(c); SPELLS_BY_CIRCLE[circle].forEach((name)=>{const category=spellCategory(name); const mp=spellManaCost(circle,category); MAGIC_POOL.push({key:makeSpellKey(circle,name),name,circle,category,rangeText: category==='area'?'광역':(category==='smallArea'?'소범위':'단일'),mp,damage:spellPower(mp,circle,category)});});});
+  function getMagicByKey(key){return MAGIC_POOL.find((m)=>m.key===key);}
+  function normalizeKnownMagic(){player.knownMagic=player.knownMagic.filter((k)=>typeof k==='string'&&!!getMagicByKey(k)); if(!player.selectedMagicKey||!getMagicByKey(player.selectedMagicKey)){player.selectedMagicKey=player.knownMagic[0]||'';} }
 
   function totalStatPoints() { return 60 + (player.level - 1) * 3; }
   function spentStats() { return player.str+player.agi+player.vit+player.int+player.wis+player.looks; }
@@ -206,10 +227,10 @@
       const result = tryLearnMagic(item, options);
       if (result.ok) {
         removeInventoryAt(index);
-        state.itemUseMessage = '마법서 습득 성공';
+        state.itemUseMessage = result.spellKey ? `마법 습득 성공: ${getMagicByKey(result.spellKey).name}` : '마법서 습득 성공';
         return true;
       }
-      state.itemUseMessage = '마법서 습득 실패: 책은 사라지지 않습니다.';
+      state.itemUseMessage = result.reason === 'already_known' ? '새로 배울 마법이 없습니다. 책 유지.' : '마법서 습득 실패: 책은 사라지지 않습니다.';
       return false;
     }
 
@@ -325,6 +346,7 @@
     enemy.hurtTimer = 0;
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
+    autoResolveFloorClear();
   }
 
   function clearReset() {
@@ -440,6 +462,9 @@
         statAllocationBase: state.statAllocationBase ? { ...state.statAllocationBase } : null,
         itemUseMessage: state.itemUseMessage,
         shopMessage: state.shopMessage,
+        floorClearResolved: !!state.floorClearResolved,
+        floorRewardClaimed: !!state.floorRewardClaimed,
+        pendingFloorClearResolve: !!state.pendingFloorClearResolve,
       },
       player: {
         name: player.name, title: player.title, mantra: player.mantra,
@@ -449,7 +474,7 @@
         x: player.x, y: player.y, vx: player.vx, vy: player.vy, hp: player.hp, mp: player.mp,
         attackCooldown: player.attackCooldown, dashCooldown: player.dashCooldown, facing: player.facing,
         skillCooldown: player.skillCooldown, magicCooldown: player.magicCooldown,
-        knownMagic: [...player.knownMagic], inventory: [...player.inventory],
+        knownMagic: [...player.knownMagic], selectedMagicKey: player.selectedMagicKey, inventory: [...player.inventory],
       },
       enemy: {
         alive: enemy.alive, x: enemy.x, y: enemy.y, w: enemy.w, h: enemy.h, vx: enemy.vx,
@@ -485,10 +510,15 @@
       state.statAllocationBase = s.statAllocationBase && typeof s.statAllocationBase === 'object' ? { ...s.statAllocationBase } : null;
       state.itemUseMessage = typeof s.itemUseMessage === 'string' ? s.itemUseMessage : '';
       state.shopMessage = typeof s.shopMessage === 'string' ? s.shopMessage : '';
+      state.floorClearResolved = !!s.floorClearResolved;
+      state.floorRewardClaimed = !!s.floorRewardClaimed;
+      state.pendingFloorClearResolve = !!s.pendingFloorClearResolve;
 
       Object.assign(player, p);
       player.inventory = [...p.inventory];
       player.knownMagic = [...p.knownMagic];
+      player.selectedMagicKey = typeof p.selectedMagicKey === 'string' ? p.selectedMagicKey : '';
+      normalizeKnownMagic();
 
       Object.assign(enemy, e);
       const fallback = enemyTypes.find(type => type.id === (enemy.typeId || 'goblin')) || enemyTypes.find(type => type.id === 'goblin') || enemyTypes[0];
@@ -587,20 +617,33 @@
     if (d) d.onclick = () => deleteSave();
   }
 
+  function autoResolveFloorClear() {
+    if (!state.pendingFloorClearResolve) return false;
+    if (state.floorClearResolved) return false;
+    clearReset();
+    applyFiveLevelPlus();
+    rewardRoll();
+    state.floorClearResolved = true;
+    state.floorRewardClaimed = false;
+    state.pendingFloorClearResolve = false;
+    state.innerPhase = state.rewardCandidates.length ? 'rewardPick' : 'menu';
+    return true;
+  }
+
   function enterInnerWorld() {
     state.itemUseMessage = '';
     state.shopMessage = '';
     state.gameState = 'innerWorld';
     state.innerPhase = 'menu';
-    state.innerActionsDone = { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false };
+    state.innerActionsDone = { clearReset: true, fiveLevelPlus: true, rewardConfirmed: false };
     resetInput();
-    resetRewardState();
     transientNotice = { text: '', until: 0 };
     state.statAllocationBase = null;
     projectiles = [];
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
+    autoResolveFloorClear();
   }
 
   function goNextFloor() {
@@ -610,6 +653,9 @@
     state.gameState = 'battle';
     state.innerPhase = null;
     state.innerActionsDone = { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false };
+    state.floorClearResolved = false;
+    state.floorRewardClaimed = false;
+    state.pendingFloorClearResolve = false;
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
@@ -622,17 +668,22 @@
   }
 
   function tryLearnMagic(book, options = {}) {
-    const diffMap = {'기초 마법서':50,'중급 마법서':70,'고급 마법서':100,'마도서':100};
-    const diff = diffMap[book];
-    if (!diff) return { ok: false, reason: 'not_magic_book' };
-    const roll = typeof options.forceRoll === 'number' ? options.forceRoll : (Math.floor(Math.random() * diff) + 1);
-    const success = player.wis >= diff || roll < player.wis;
-    if (success && !player.knownMagic.includes(book)) player.knownMagic.push(book);
-    return { ok: success, reason: success ? 'learned' : 'failed_retryable' };
+    const tier = SPELL_BOOK_TIERS[book];
+    if (!tier) return { ok: false, reason: 'not_magic_book' };
+    const candidates = MAGIC_POOL.filter((m) => m.circle >= tier.minCircle && m.circle <= tier.maxCircle && !player.knownMagic.includes(m.key));
+    if (!candidates.length) return { ok: false, reason: 'already_known' };
+    const roll = typeof options.forceRoll === 'number' ? options.forceRoll : (Math.floor(Math.random() * tier.difficulty) + 1);
+    const success = player.wis >= tier.difficulty || roll < player.wis;
+    if (!success) return { ok: false, reason: 'failed_retryable' };
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    player.knownMagic.push(pick.key);
+    if (!player.selectedMagicKey) player.selectedMagicKey = pick.key;
+    return { ok: true, reason: 'learned', spellKey: pick.key };
   }
 
   function renderHUD() {
     syncVitals();
+    normalizeKnownMagic();
     hudEl.innerHTML = `
       <div><span class="tag">이름</span>: ${player.name}</div>
       <div><span class="tag">칭호</span>: ${player.title}</div>
@@ -737,19 +788,13 @@
       const rewardStatus = action.rewardConfirmed ? '완료' : (state.rewardCandidates.length ? '선택중' : '대기');
       phasePanel.innerHTML = `<div><b>심상세계 메뉴</b></div>
       <div class="stat-actions">
-        <button id="btnClear" ${action.clearReset ? 'disabled' : ''}>정비 ${action.clearReset ? '완료' : ''}</button>
-        <button id="btnLvl" ${action.fiveLevelPlus ? 'disabled' : ''}>+5레벨 ${action.fiveLevelPlus ? '완료' : ''}</button>
         <button id="btnReward">보상 ${rewardStatus}</button>
         <button id="btnStat">스탯</button>
         <button id="btnItem">아이템</button>
         <button id="btnShop">상점</button>
         <button id="btnNext">다음 층</button>
       </div>${notice}`;
-      const clearBtn=document.getElementById('btnClear');
-      if(clearBtn) clearBtn.onclick=()=>{ if(state.innerActionsDone.clearReset)return; clearReset(); state.innerActionsDone.clearReset=true; transientNotice={text:'정비 완료',until:Date.now()+1200}; renderPhasePanel(); };
-      const lvlBtn=document.getElementById('btnLvl');
-      if(lvlBtn) lvlBtn.onclick=()=>{ if(state.innerActionsDone.fiveLevelPlus)return; applyFiveLevelPlus(); state.innerActionsDone.fiveLevelPlus=true; transientNotice={text:'레벨 +5',until:Date.now()+1200}; renderPhasePanel(); };
-      document.getElementById('btnReward').onclick=()=>{ if(!state.rewardCandidates.length&&!state.innerActionsDone.rewardConfirmed) rewardRoll(); state.innerPhase='rewardPick'; renderPhasePanel(); };
+      document.getElementById('btnReward').onclick=()=>{ state.innerPhase='rewardPick'; renderPhasePanel(); };
       document.getElementById('btnStat').onclick=()=>{ state.innerPhase='statAllocate'; renderPhasePanel(); };
       document.getElementById('btnItem').onclick=()=>{ state.innerPhase='skillTechMagicTrait'; renderPhasePanel(); };
       document.getElementById('btnShop').onclick=()=>{ state.innerPhase='shop'; renderPhasePanel(); };
@@ -768,7 +813,7 @@
       document.getElementById('confirmReward').onclick = () => {
         if (state.rewardSelected.size !== state.rewardMeta.pickCount) return;
         [...state.rewardSelected].forEach(i => applyReward(state.rewardCandidates[i]));
-        state.innerActionsDone.rewardConfirmed = true; transientNotice = { text: '보상 확정', until: Date.now() + 1200 }; state.innerPhase = 'menu';
+        state.innerActionsDone.rewardConfirmed = true; state.floorRewardClaimed = true; transientNotice = { text: '보상 확정', until: Date.now() + 1200 }; state.innerPhase = 'menu';
       };
     } else if (p === 'statAllocate') {
       ensureStatAllocationBase();
@@ -816,8 +861,13 @@
         ? player.inventory.map((item, i) => `<div class="stat-row"><span>${item}</span><div><button class="use-item" data-idx="${i}">사용</button></div></div>`).join('')
         : '<div>보유 아이템 없음</div>';
       const msg = state.itemUseMessage ? `<div class="stat-message">${state.itemUseMessage}</div>` : '';
-      phasePanel.innerHTML = `<div><b>아이템 사용</b></div>${msg}<div class="stat-grid">${inventoryRows}</div><button id="goShop">메뉴로</button>`;
+      normalizeKnownMagic();
+      const magicOptions = player.knownMagic.map((key)=>{ const m = getMagicByKey(key); return m ? `<option value="${m.key}" ${player.selectedMagicKey===m.key?'selected':''}>${m.name} (C${m.circle}/MP ${m.mp})</option>` : ''; }).join('');
+      const selectedMagic = getMagicByKey(player.selectedMagicKey);
+      const magicInfo = selectedMagic ? `현재 선택 마법: ${selectedMagic.name} / ${selectedMagic.circle}서클 / MP ${selectedMagic.mp}` : '현재 선택 마법: 없음';
+      phasePanel.innerHTML = `<div><b>아이템/마법</b></div>${msg}<div class="stat-message">${magicInfo}</div><div>${player.knownMagic.length?`<select id="magicSelect">${magicOptions}</select>`:'보유 마법 없음'}</div><div class="stat-grid">${inventoryRows}</div><button id="goShop">메뉴로</button>`;
       phasePanel.querySelectorAll('.use-item').forEach(btn => btn.onclick = () => { useInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
+      const magicSelect = document.getElementById('magicSelect'); if (magicSelect) magicSelect.onchange = () => { player.selectedMagicKey = magicSelect.value; renderPhasePanel(); };
       document.getElementById('goShop').onclick = () => { state.itemUseMessage = ''; state.innerPhase='menu'; renderPhasePanel(); };
     } else if (p === 'shop') {
       const shopItems = getShopItems();
@@ -876,6 +926,7 @@
     enemy.hp = 0;
     enemy.hurtTimer = 0;
     projectiles = [];
+    state.pendingFloorClearResolve = true;
     enterInnerWorld();
     return true;
   }
@@ -938,11 +989,23 @@
   function castSmallFireball() {
     if (state.gameState !== 'battle' || !enemy.alive) return;
     if (player.magicCooldown > 0) return showBattleNotice('마법 재사용 대기 중입니다.');
-    if (player.mp < 15) return showBattleNotice('MP가 부족합니다.');
-    player.mp -= 15;
+    normalizeKnownMagic();
+    const selected = getMagicByKey(player.selectedMagicKey) || getMagicByKey(player.knownMagic[0]);
+    if (!selected) return showBattleNotice('보유 마법 없음');
+    if (player.mp < selected.mp) return showBattleNotice('MP 부족');
+    player.mp -= selected.mp;
     player.magicCooldown = 1.0;
-    projectiles.push({ type:'fireball', x: player.facing === 1 ? player.x + player.w : player.x - 12, y: player.y + player.h * 0.45, vx: player.facing * 420, w:12, h:12, damage: Math.max(1, Math.floor(player.int * 3)), alive:true });
-    showBattleNotice('작은 화염구!');
+    if (selected.category === 'heal') {
+      const heal = Math.max(1, selected.damage);
+      player.hp = Math.min(derived.maxHp, player.hp + heal);
+    } else if (selected.category === 'defense') {
+      player.invincibleTimer = Math.max(player.invincibleTimer, 0.6);
+    } else if (selected.category === 'utility') {
+      enemy.attackCd = Math.max(enemy.attackCd, 0.8);
+    } else {
+      applyEnemyDamage(Math.max(1, selected.damage), 16, 'magic');
+    }
+    showBattleNotice(`${selected.name} 사용`);
   }
 
   function updateProjectiles(dt) {
@@ -973,6 +1036,9 @@
     state.gameState = 'initialStatAllocate';
     state.innerPhase = null;
     state.innerActionsDone = { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false };
+    state.floorClearResolved = false;
+    state.floorRewardClaimed = false;
+    state.pendingFloorClearResolve = false;
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
@@ -1226,7 +1292,8 @@
       results.nextFloorRestoresHpMp = player.hp === derived.maxHp && player.mp === derived.maxMp;
 
       const levelBeforeInner = player.level;
-      enterInnerWorld();
+      state.pendingFloorClearResolve = true;
+    enterInnerWorld();
       results.enterInnerWorldDoesNotAutoClearOrLevel = state.gameState === 'innerWorld' && state.innerPhase === 'menu' && player.level === levelBeforeInner;
 
       player.level = 1; player.int = 1; player.inner = 0; player.swordAura = 1; syncVitals();
@@ -1614,7 +1681,8 @@
 
 
       state.gameState = 'innerWorld';
-      enterInnerWorld();
+      state.pendingFloorClearResolve = true;
+    enterInnerWorld();
       results.enterInnerWorldStartsAtMenu = state.innerPhase === 'menu';
       renderPhasePanel();
       const menuIds = ['btnClear','btnLvl','btnReward','btnStat','btnItem','btnShop','btnNext'];
