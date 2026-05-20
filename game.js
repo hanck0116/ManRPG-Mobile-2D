@@ -723,7 +723,8 @@
       <div class="stat-message">선택 마법: ${selectedMagic ? selectedMagic.name : '없음'}</div>`;
     const enemyHpText = state.gameState === 'innerWorld' ? '클리어 완료' : (enemy.alive ? `${Math.max(0, Math.floor(enemy.hp))} / ${enemy.maxHp}` : '처치됨');
     const ratio = enemy.maxHp > 0 ? Math.max(0, Math.min(100, (enemy.hp / enemy.maxHp) * 100)) : 0;
-    enemyBarEl.classList.toggle('hidden', state.gameState==='innerWorld');
+    const showEnemyBar = state.gameState === 'battle';
+    enemyBarEl.classList.toggle('hidden', !showEnemyBar);
     enemyBarEl.innerHTML = `<div>${enemy.name || '적'} <span style="float:right">HP ${enemyHpText}</span></div><div class="enemy-hp"><i style="width:${ratio}%"></i></div>`;
   }
 
@@ -765,6 +766,7 @@
 
 
   function renderSystemMenu() {
+    if (state.systemMenuOpen) state.quickSlotCollapsed = true;
     systemMenuEl.classList.toggle('hidden', !state.systemMenuOpen);
     systemMenuEl.innerHTML = saveButtonsHtml() + debugControlsHtml();
     bindSaveButtons();
@@ -777,7 +779,7 @@
   }
 
   function renderQuickSlotTray() {
-    if (state.gameState === 'innerWorld') {
+    if (state.gameState === 'innerWorld' || state.gameState === 'initialStatAllocate' || state.uiOverlay === 'magic') {
       quickSlotTrayEl.classList.add('hidden');
       return;
     }
@@ -788,9 +790,13 @@
     state.quickSlotPage = Math.max(0, Math.min(state.quickSlotPage, pages - 1));
     const pageItems = items.slice(state.quickSlotPage * pageSize, state.quickSlotPage * pageSize + pageSize);
     const emptyText = state.quickSlotTab === 'magic' && !items.length ? '<div class="stat-message">보유 마법 없음</div>' : '';
-    quickSlotTrayEl.innerHTML = `<div class="slot-tabs"><span>퀵슬롯</span><button id="slotSkillTab">스킬</button><button id="slotMagicTab">마법</button><button id="toggleTray" style="margin-left:auto">${state.quickSlotCollapsed?'스킬/마법 ▲':'접기 ▼'}</button></div>${state.quickSlotCollapsed ? '' : `${emptyText}<div class="slot-grid">${(pageItems.length?pageItems:[null]).map((item)=> item ? `<button class="slot quick-slot-btn ${player.selectedMagicKey===item.key?'selected':''}" data-key="${item.key}">${item.name}<br>${item.circle !== '-' ? `C${item.circle} MP${item.mp}` : '전용'}</button>` : '<button class="slot" disabled>빈</button>').join('')}</div><div class="slot-page"><button id="slotPrev">◀</button><span>${state.quickSlotPage+1} / ${pages}</span><button id="slotNext">▶</button></div>`}`;
-    document.getElementById('slotSkillTab').onclick = ()=>{state.quickSlotTab='skill';state.quickSlotPage=0;renderQuickSlotTray();};
-    document.getElementById('slotMagicTab').onclick = ()=>{state.quickSlotTab='magic';state.quickSlotPage=0;renderQuickSlotTray();};
+    quickSlotTrayEl.innerHTML = state.quickSlotCollapsed
+      ? `<div class="slot-tabs"><button id="toggleTray" style="margin-left:auto">${state.quickSlotTab==='skill'?'퀵슬롯 ▲':'스킬/마법 ▲'}</button></div>`
+      : `<div class="slot-tabs"><span>퀵슬롯</span><button id="slotSkillTab">스킬</button><button id="slotMagicTab">마법</button><button id="toggleTray" style="margin-left:auto">접기 ▼</button></div>${emptyText}<div class="slot-grid">${(pageItems.length?pageItems:[null]).map((item)=> item ? `<button class="slot quick-slot-btn ${player.selectedMagicKey===item.key?'selected':''}" data-key="${item.key}">${item.name}<br>${item.circle !== '-' ? `C${item.circle} MP${item.mp}` : '전용'}</button>` : '<button class="slot" disabled>빈</button>').join('')}</div><div class="slot-page"><button id="slotPrev">◀</button><span>${state.quickSlotPage+1} / ${pages}</span><button id="slotNext">▶</button></div>`;
+    const slotSkillTab = document.getElementById('slotSkillTab');
+    const slotMagicTab = document.getElementById('slotMagicTab');
+    if (slotSkillTab) slotSkillTab.onclick = ()=>{state.quickSlotTab='skill';state.quickSlotPage=0;renderQuickSlotTray();};
+    if (slotMagicTab) slotMagicTab.onclick = ()=>{state.quickSlotTab='magic';state.quickSlotPage=0;renderQuickSlotTray();};
     document.getElementById('toggleTray').onclick = ()=>{state.quickSlotCollapsed=!state.quickSlotCollapsed;renderQuickSlotTray();};
     const prev=document.getElementById('slotPrev'); const next=document.getElementById('slotNext');
     if(prev) prev.onclick=()=>{state.quickSlotPage=Math.max(0,state.quickSlotPage-1);renderQuickSlotTray();};
@@ -836,7 +842,9 @@
     }
     if (state.gameState === 'battle') {
       phasePanel.className='phase-panel compact-notice';
-      phasePanel.innerHTML = `<div>적 처치 시 심상세계 진입</div><div>선택 마법: ${(getMagicByKey(player.selectedMagicKey)||{name:'없음',circle:'-',mp:0}).name} / C${(getMagicByKey(player.selectedMagicKey)||{circle:'-'}).circle} / MP ${(getMagicByKey(player.selectedMagicKey)||{mp:0}).mp} | 인벤 ${player.inventory.length}개</div>${notice}`;
+      const n1 = '적 처치 시 심상세계 진입';
+      const n2 = `선택 마법: ${(getMagicByKey(player.selectedMagicKey)||{name:'없음',circle:'-',mp:0}).name} / C${(getMagicByKey(player.selectedMagicKey)||{circle:'-'}).circle} / MP ${(getMagicByKey(player.selectedMagicKey)||{mp:0}).mp}`;
+      phasePanel.innerHTML = `<div>${n1}</div><div>${n2}</div>${notice}`;
       appendPanelControls();
       return;
     }
@@ -852,8 +860,8 @@
       const rewardStatus = action.rewardConfirmed ? '보상 완료' : (state.rewardCandidates.length ? '보상 선택중' : '보상 대기');
       phasePanel.className='phase-panel modal-card';
       phasePanel.innerHTML = `<div><b>심상세계</b></div><div>층 ${state.floor} | Lv ${player.level} | HP ${Math.floor(player.hp)}/${derived.maxHp} | MP ${Math.floor(player.mp)}/${derived.maxMp} | 코인 ${player.coin}</div>
-      <div class="stat-actions">
-        <button id="btnReward">보상 ${rewardStatus}</button>
+      <div class="stat-actions inner-world-menu-grid">
+        <button id="btnReward">${state.floorRewardClaimed ? "보상 완료" : "보상"}</button>
         <button id="btnStat">스탯</button>
         <button id="btnItem">아이템</button>
         <button id="btnShop">상점</button>
@@ -1892,6 +1900,36 @@ results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType
       results.innerWorldHidesBattleEnemyEmphasis = enemyBarEl.classList.contains('hidden');
       state.systemMenuOpen = true; state.gameState='battle'; renderSystemMenu();
       results.systemMenuDoesNotCoverQuickSlots = !!document.getElementById('systemMenu');
+
+      state.gameState = 'battle'; state.quickSlotCollapsed = true; state.quickSlotTab = 'magic'; renderQuickSlotTray();
+      const quickToggle = document.getElementById('toggleTray');
+      results.quickSlotCollapsedTextReadable = !!quickToggle && quickToggle.textContent.length >= 5;
+      results.quickSlotCollapsedDoesNotWrap = quickToggle ? (quickToggle.textContent.indexOf('\n') === -1) : false;
+      state.quickSlotCollapsed = false; renderQuickSlotTray();
+      const quickRect = quickSlotTrayEl.getBoundingClientRect();
+      const controlsRect = controls.getBoundingClientRect();
+      results.quickSlotExpandedDoesNotOverlapControls = quickRect.bottom <= controlsRect.top + 6 || quickRect.left >= controlsRect.right || quickRect.right <= controlsRect.left;
+      state.gameState = 'battle'; renderPhasePanel();
+      const noticeRect = phasePanel.getBoundingClientRect();
+      const enemyRect = enemyBarEl.getBoundingClientRect();
+      results.battleNoticeDoesNotCoverActors = noticeRect.top >= enemyRect.bottom || noticeRect.bottom <= enemyRect.top;
+      state.gameState='innerWorld'; state.innerPhase='menu'; renderPhasePanel();
+      const controlsStyle = window.getComputedStyle(controls);
+      results.innerWorldControlsAreDimmed = Number(controlsStyle.opacity) <= 0.2;
+      results.innerWorldMenuButtonsUseGrid = phasePanel.querySelector('.inner-world-menu-grid') !== null;
+      renderHUD();
+      results.enemyBarHiddenOutsideBattle = enemyBarEl.classList.contains('hidden');
+      state.systemMenuOpen = true; renderSystemMenu();
+      systemMenuToggleEl.click();
+      results.systemMenuClosesOnToggle = state.systemMenuOpen === false && systemMenuEl.classList.contains('hidden');
+      state.systemMenuOpen = true; state.quickSlotCollapsed = false; state.gameState='battle'; renderSystemMenu(); renderQuickSlotTray();
+      const menuRect = systemMenuEl.getBoundingClientRect();
+      const trayRect = quickSlotTrayEl.getBoundingClientRect();
+      results.systemMenuDoesNotOverlapQuickSlot = menuRect.bottom <= trayRect.top || menuRect.top >= trayRect.bottom || menuRect.right <= trayRect.left || menuRect.left >= trayRect.right;
+      state.uiOverlay = 'magic'; skillMagicOverlayEl.classList.remove('hidden'); renderQuickSlotTray();
+      results.skillMagicOverlayHidesQuickSlot = quickSlotTrayEl.classList.contains('hidden');
+      state.uiOverlay = ''; skillMagicOverlayEl.classList.add('hidden');
+
     } finally {
       Object.assign(player, backupPlayer);
       Object.assign(enemy, backupEnemy);
