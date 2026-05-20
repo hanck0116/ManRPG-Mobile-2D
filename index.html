@@ -21,13 +21,19 @@
   </main>
 
   <section class="controls" id="controls">
-    <button data-action="left">←</button>
-    <button data-action="right">→</button>
-    <button data-action="jump">점프</button>
-    <button data-action="dash">대시</button>
-    <button data-action="attack">공격</button>
-    <button data-action="skill">스킬</button>
-    <button data-action="magic">마법</button>
+    <div class="control-group left">
+      <button data-action="left">←</button>
+      <button data-action="right">→</button>
+    </div>
+    <div class="control-group center">
+      <button data-action="jump">점프</button>
+      <button data-action="dash">대시</button>
+    </div>
+    <div class="control-group right">
+      <button data-action="attack">공격</button>
+      <button data-action="skill">스킬</button>
+      <button data-action="magic">마법</button>
+    </div>
   </section>
 
   <script src="game.js"></script>

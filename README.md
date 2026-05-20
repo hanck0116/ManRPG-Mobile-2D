@@ -360,3 +360,22 @@ window.ManRPG.runDebugTests()
 - 심상세계 오버레이 메뉴 구성
 - 시스템 메뉴(저장/불러오기/삭제/테스트 실행) 접근 개선
 - runDebugTests 키 보강: quickSlotTrayRenders, quickSlotTabSwitchWorks, magicQuickSlotSelectsSelectedMagic, skillMagicOverlayOpens, skillMagicOverlayCloses, innerWorldOverlayMenuRenders, systemMenuButtonsRemainBound, controlsRemainBoundAfterUiRedesign, spawnEnemyDoesNotResolveFloorClear, autoFloorClearOnlyAfterEnemyDefeat, rewardCannotBeClaimedTwice
+
+## 가로형 UI 보강 v0.2
+- 초기 스탯 분배 중앙 모달
+- 전투 알림 최소화
+- 접이식 스킬/마법 퀵슬롯
+- 엄지 조작 기준 컨트롤 재배치
+- 심상세계 전용 오버레이 카드
+- 시스템 메뉴 정리
+- 새 runDebugTests 키 목록
+  - initialStatPanelIsModal
+  - initialStatPanelDoesNotOverflow
+  - battleNoticeIsCompact
+  - quickSlotStartsCollapsed
+  - quickSlotDoesNotCoverEnemyBar
+  - quickSlotSelectedMagicVisible
+  - controlsGroupedForLandscape
+  - innerWorldUsesOverlayCard
+  - innerWorldHidesBattleEnemyEmphasis
+  - systemMenuDoesNotCoverQuickSlots
