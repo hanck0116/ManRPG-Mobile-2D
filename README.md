@@ -316,3 +316,12 @@ window.ManRPG.runDebugTests()
 - `runDebugTests()`의 전투 시나리오들 사이에 `resetInput()`과 `clearCombatFeedback()` 초기화를 보강해 입력/피드백 잔여 상태로 인한 테스트 간섭을 줄였습니다.
 - `defeatedStopsBattleInput` 검증을 강화해 `defeated` 상태에서 `updateBattle(0.016)` 직접 호출 시 플레이어 위치와 적 HP가 유지되는지 확인합니다.
 - `debugTestsRestoreState`의 복구 안정성을 위해 테스트 종료 후 `keys`, `projectiles`, `hitStopTimer`, `screenShakeTimer`, `enemy.windupTimer`, `enemy.pendingAttack`, `player.invincibleTimer`, `player.hurtTimer`가 원래 값으로 되돌아가도록 복구 경로를 명시했습니다.
+
+## 자동 클리어 정산 및 전체 마법 시스템 v0.1
+- 층 클리어 시 `clearReset() -> applyFiveLevelPlus() -> rewardRoll()`이 자동 1회 실행되며 심상세계에서 즉시 보상 선택 단계로 진입합니다.
+- `floorClearResolved`, `floorRewardClaimed` 플래그로 중복 자동 정산/보상 무한 반복을 방지했습니다.
+- 1~9서클 전체 마법 목록을 `MAGIC_POOL`로 등록하고, 카테고리/MP/위력 계산(`spellCategory`, `spellManaCost`, `spellPowerRatio`, `spellPower`)을 추가했습니다.
+- 마법서(기초/중급/고급/마도서)는 등급별 서클/난이도 규칙으로 실제 `spellKey`를 습득합니다.
+- 전투 마법은 선택 마법 기반으로 발동되며 보유 마법 없음/MP 부족/쿨타임을 처리합니다.
+- 모바일 UI 간소화: 좌우 버튼을 `←`, `→`로 표시하고, 심상세계 메뉴를 보상/스탯/아이템/상점/다음 층 중심으로 단순화했습니다.
+- 패널 하단 공통 컨트롤은 `appendPanelControls()`(저장+테스트 버튼)로 유지합니다.
