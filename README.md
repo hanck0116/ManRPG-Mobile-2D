@@ -325,3 +325,28 @@ window.ManRPG.runDebugTests()
 - 전투 마법은 선택 마법 기반으로 발동되며 보유 마법 없음/MP 부족/쿨타임을 처리합니다.
 - 모바일 UI 간소화: 좌우 버튼을 `←`, `→`로 표시하고, 심상세계 메뉴를 보상/스탯/아이템/상점/다음 층 중심으로 단순화했습니다.
 - 패널 하단 공통 컨트롤은 `appendPanelControls()`(저장+테스트 버튼)로 유지합니다.
+
+## 자동 클리어 정산 v0.1 수정 (안정화)
+- `spawnEnemy()`에서 `autoResolveFloorClear()` 호출을 제거했습니다.
+- 자동 정산은 `handleEnemyDefeated() -> enterInnerWorld() -> autoResolveFloorClear()` 흐름에서만 실행됩니다.
+- `goNextFloor()`/초기 `spawnEnemy()` 호출 시 레벨 +5, 보상 굴림이 발생하지 않도록 정리했습니다.
+- 보상 확정 이후 `floorRewardClaimed`/`innerActionsDone.rewardConfirmed`로 재진입을 막아 보상 무한 반복을 방지했습니다.
+
+## 마법 공식 최종 기준 정렬
+- `spellCategory`를 정확 목록(`includes`) 우선 분류로 변경해 라이트닝 계열 오분류를 방지했습니다.
+- `spellPowerRatio`, `spellManaCost`, `spellPower`를 ManRPG_v18_FINAL_병합패키지 최종 공식 기준으로 정렬했습니다.
+- `spellRangeText` 표현도 최종 분류 체계(단일/단일 고집중/소범위/광역/방어/회복/소환/기능)로 맞췄습니다.
+
+## runDebugTests 수정
+- 자동 정산/보상/마법 구조 기준으로 기존 테스트 기대값을 수정했습니다.
+- 신규/보강 키:
+  - `autoFloorClearIncreasesLevel`
+  - `autoFloorClearRollsReward`
+  - `spawnEnemyDoesNotResolveFloorClear`
+  - `goNextFloorDoesNotAutoResolve`
+  - `initialSpawnDoesNotAutoResolve`
+  - `magicNoKnownSpellFails`
+  - `magicMpInsufficientFails`
+  - `magicHealRestoresHp`
+  - `magicDefenseAppliesState`
+  - `magicUtilityAppliesState`
