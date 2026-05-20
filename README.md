@@ -407,3 +407,12 @@ window.ManRPG.runDebugTests()
 - 전투 상태효과: enemy slow/bind/sleep/blind/silence/dot, player shield/barrier/buff/evasion
 - 퀵슬롯/오버레이 선택 마법과 전투 마법 버튼 연동 유지
 - runDebugTests 확장 키: castSelectedMagicExists, allMagicPoolEntriesHaveEffect, everySpellCanResolveEffect, selectedMagicCastsAndConsumesMp, magicFailsWithoutKnownMagic, magicFailsWithoutMp 등
+
+## 스킬 제작 시스템 v0.1
+- `knownSkills`, `selectedSkillKey`를 플레이어 저장 구조에 추가하고 구버전 세이브 로드시 안전 기본값(`harvest_slash`)을 복구합니다.
+- `SKILL_POOL`(수확/속공/강타/돌진/방어 파쇄/공중/집중/휩쓸기)을 추가하고 스킬별 MP, 쿨타임, 배율, 사거리, 넉백, 제작 비용(`craftCost`), 레벨 조건(`requiredLevel`)을 관리합니다.
+- 심상세계 메뉴에 `스킬` 버튼과 `skillCraft` 화면을 추가해 제작/보유/선택을 처리합니다.
+- quickSlotTray 스킬 탭을 `knownSkills` 기반으로 바꾸고 탭 슬롯 클릭 시 `selectedSkillKey`를 변경합니다.
+- skill 버튼 입력은 `useSelectedSkill()`로 통합되어 선택 스킬을 사용하며, 미보유/잘못된 선택값은 `harvest_slash`로 자동 복구됩니다.
+- 저장/불러오기(`serializeGameState`, `applySerializedGameState`)에 `knownSkills`, `selectedSkillKey`를 포함했습니다.
+- runDebugTests 신규 키: skillPoolDefined, defaultKnownSkillIncludesHarvestSlash, normalizeKnownSkillsRestoresHarvestSlash, selectedSkillDefaultsSafely, skillCraftPhaseRenders, skillCraftButtonCreatesSkill, skillCraftConsumesCoin, skillCraftPreventsDuplicate, skillCraftFailsWithoutCoin, skillCraftFailsWithoutLevel, quickSlotSkillTabUsesKnownSkills, quickSlotSkillSelectsSelectedSkill, skillOverlayShowsKnownSkills, selectedSkillUsesMp, selectedSkillAppliesCooldown, selectedSkillDamagesEnemy, selectedSkillFailsWithoutMp, selectedSkillFallbacksToHarvestSlash, knownSkillsSaveLoadRoundTrip, selectedSkillSaveLoadRoundTrip.
