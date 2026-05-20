@@ -78,12 +78,36 @@
     '마도서': { minCircle:7, maxCircle:9, difficulty:100 }
   };
   const SPELLS_BY_CIRCLE = {1:['라이트','파이어','아이스','윈드','매직 애로우','그리스','디그','다크니스'],2:['샤이닝 에로우','파이어 애로우','아이스 애로우','윈드 애로우','록 애로우','라이트닝 애로우','쉴드','힐','아이스 포그','다크 애로우'],3:['샤이닝 디펜스','파이어 볼','아이스 볼','윈드 커터','스톤 스파이크','라이데인','슬립','캔슬레이션','본 바인딩','다크 볼','웹','메모라이즈'],4:['샤이닝 웨이브','샤이닝 인첸트','샤이닝 블레스터','파이어 랜스','아이스 스피어','에어로 봄','어스 브레이크','블라인드','슬로우','사일런스','일루젼','컨퓨전'],5:['인비저빌리티','디스토션','샤이닝 필드','레이져','배리어','익스플로전','체인 라이트닝','파이어 월','블링크','그래비티','다크 필드','라이프 드레인'],6:['샤이닝 레이져','서먼 샤이닝','안티 매직 쉘','필라 오브 파이어','기가 라이데인','토네이도','디스펠','그레이트 쉴드','텔레포트','그레이트 힐','다크 캐논','서먼 본 와이번'],7:['샤이닝 저지먼트','헤븐스 도어','인페르노','블리자드','어스 퀘이크','윈드 스톰','워프','리플렉션','그래비티','서먼 데스나이트'],8:['소드 오브 리벤지 라이트','샤이닝 레인','볼케이노','아이스 크리스탈 오브 스톰','퓨리 오브 더 헤븐','라이트닝 인피니티','컨트롤 웨더','매스 텔레포트','헬파이어','서먼 본 드래곤'],9:['메테오 스트라이크','메테오 스웜','앱솔루트 제로 포인트','라이트닝 월드','루인 오브 그라운드','엘리멘탈 퍼니시먼트','앱솔루트 쉴드','워프 게이트','파워 워드 킬','네크로폴리스']};
-  function spellCategory(name){const n=name; if(/힐/.test(n))return 'heal'; if(/쉴드|디펜스|배리어|리플렉션/.test(n))return 'defense'; if(/서먼/.test(n))return 'summon'; if(/필드|웨이브|월|스톰|토네이도|볼케이노|메테오 스웜|네크로폴리스/.test(n))return 'area'; if(/볼|브레이크|퀘이크|크리스탈/.test(n))return 'smallArea'; if(/레이져|인피니티|저지먼트|퍼니시먼트|파워 워드 킬/.test(n))return 'singleHigh'; if(/라이트|슬립|캔슬레이션|블라인드|슬로우|사일런스|일루젼|컨퓨전|인비저빌리티|디스토션|블링크|디스펠|텔레포트|워프|컨트롤 웨더|워프 게이트|메모라이즈|그리스|디그|다크니스/.test(n))return 'utility'; return 'single';}
-  function spellPowerRatio(circle,cat){const base=0.18+circle*0.05; const m={utility:0.08,defense:0.12,heal:0.2,summon:0.35,area:0.28,smallArea:0.4,singleHigh:0.7,single:0.5}[cat]||0.5; return Math.min(0.95,base*m);}
-  function spellManaCost(circle,cat){const m={utility:0.8,defense:0.9,heal:0.9,summon:1.05,area:1.0,smallArea:1.0,singleHigh:1.1,single:1.0}[cat]||1; return Math.max(1,Math.floor(SPELL_MP[circle]*m));}
-  function spellPower(mp,circle,cat){return Math.max(0,Math.min(mp,Math.floor(mp*spellPowerRatio(circle,cat))));}
+  function spellCategory(name){
+    const utility=['라이트','슬립','캔슬레이션','블라인드','슬로우','사일런스','일루젼','컨퓨전','인비저빌리티','디스토션','블링크','디스펠','텔레포트','워프','컨트롤 웨더','워프 게이트','메모라이즈','그리스','디그','다크니스'];
+    const defense=['쉴드','디펜스','배리어','리플렉션'];
+    const heal=['힐'];
+    const area=['플레임 필드','메테오 스웜','라이트닝 월드','아이스 스톰','토네이도','볼케이노','네크로폴리스'];
+    const smallArea=['파이어볼','아이스 볼','썬더 브레이크','어스 퀘이크','다크 크리스탈'];
+    const singleHigh=['플레임 레이져','라이트닝 인피니티','아이스 저지먼트','윈드 퍼니시먼트','홀리 파워 워드 킬'];
+    if (utility.includes(name)) return 'utility';
+    if (defense.includes(name)) return 'defense';
+    if (heal.includes(name)) return 'heal';
+    if (name.startsWith('서먼')) return 'summon';
+    if (area.includes(name)) return 'area';
+    if (smallArea.includes(name)) return 'smallArea';
+    if (singleHigh.includes(name)) return 'singleHigh';
+    return 'single';
+  }
+  function spellPowerRatio(circle,cat){
+    const base=Math.min(1,(circle+0.2)/6);
+    const rangePenalty={singleHigh:1.00,single:0.86,smallArea:0.68,area:0.45,defense:0.80,heal:0.72,summon:0.60,utility:0.35}[cat]??0.86;
+    return Math.min(1,base*rangePenalty);
+  }
+  function spellManaCost(circle,cat){
+    const base=SPELL_MP[circle]||1;
+    const costMul={singleHigh:1.00,single:0.95,smallArea:1.05,area:1.15,defense:0.95,heal:1.00,summon:1.15,utility:0.80}[cat]??0.95;
+    return Math.max(1,Math.round(base*costMul));
+  }
+  function spellPower(mp,circle,cat){return Math.min(mp,Math.max(1,Math.floor(mp*spellPowerRatio(circle,cat))));}
+  function spellRangeText(category){return {single:'단일',singleHigh:'단일 고집중',smallArea:'소범위',area:'광역',defense:'방어',heal:'회복',summon:'소환',utility:'기능'}[category]||'단일';}
   function makeSpellKey(circle,name){return `c${circle}_`+name.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').replace(/^_|_$/g,'');}
-  const MAGIC_POOL=[]; Object.keys(SPELLS_BY_CIRCLE).forEach((c)=>{const circle=Number(c); SPELLS_BY_CIRCLE[circle].forEach((name)=>{const category=spellCategory(name); const mp=spellManaCost(circle,category); MAGIC_POOL.push({key:makeSpellKey(circle,name),name,circle,category,rangeText: category==='area'?'광역':(category==='smallArea'?'소범위':'단일'),mp,damage:spellPower(mp,circle,category)});});});
+  const MAGIC_POOL=[]; Object.keys(SPELLS_BY_CIRCLE).forEach((c)=>{const circle=Number(c); SPELLS_BY_CIRCLE[circle].forEach((name)=>{const category=spellCategory(name); const mp=spellManaCost(circle,category); MAGIC_POOL.push({key:makeSpellKey(circle,name),name,circle,category,rangeText: spellRangeText(category),mp,damage:spellPower(mp,circle,category)});});});
   function getMagicByKey(key){return MAGIC_POOL.find((m)=>m.key===key);}
   function normalizeKnownMagic(){player.knownMagic=player.knownMagic.filter((k)=>typeof k==='string'&&!!getMagicByKey(k)); if(!player.selectedMagicKey||!getMagicByKey(player.selectedMagicKey)){player.selectedMagicKey=player.knownMagic[0]||'';} }
 
@@ -345,7 +369,6 @@
     enemy.hurtTimer = 0;
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
-    autoResolveFloorClear();
   }
 
   function clearReset() {
@@ -638,7 +661,6 @@
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
-    autoResolveFloorClear();
   }
 
   function goNextFloor() {
@@ -788,7 +810,14 @@
         <button id="btnShop">상점</button>
         <button id="btnNext">다음 층</button>
       </div>${notice}`;
-      document.getElementById('btnReward').onclick=()=>{ state.innerPhase='rewardPick'; renderPhasePanel(); };
+      const btnReward = document.getElementById('btnReward');
+      if (btnReward) {
+        btnReward.disabled = !!state.floorRewardClaimed;
+        btnReward.onclick=()=>{
+          if (state.floorRewardClaimed) { transientNotice = { text: '보상 완료', until: Date.now() + 1200 }; renderPhasePanel(); return; }
+          state.innerPhase='rewardPick'; renderPhasePanel();
+        };
+      }
       document.getElementById('btnStat').onclick=()=>{ state.innerPhase='statAllocate'; renderPhasePanel(); };
       document.getElementById('btnItem').onclick=()=>{ state.innerPhase='skillTechMagicTrait'; renderPhasePanel(); };
       document.getElementById('btnShop').onclick=()=>{ state.innerPhase='shop'; renderPhasePanel(); };
@@ -805,8 +834,10 @@
         renderPhasePanel();
       });
       document.getElementById('confirmReward').onclick = () => {
+        if (state.floorRewardClaimed || state.innerActionsDone.rewardConfirmed) { transientNotice = { text: '보상 완료', until: Date.now() + 1200 }; state.innerPhase = 'menu'; return; }
         if (state.rewardSelected.size !== state.rewardMeta.pickCount) return;
         [...state.rewardSelected].forEach(i => applyReward(state.rewardCandidates[i]));
+        state.rewardSelected = new Set();
         state.innerActionsDone.rewardConfirmed = true; state.floorRewardClaimed = true; transientNotice = { text: '보상 확정', until: Date.now() + 1200 }; state.innerPhase = 'menu';
       };
     } else if (p === 'statAllocate') {
@@ -1247,6 +1278,9 @@
       shopMessage: state.shopMessage,
       saveMessage: state.saveMessage,
       debugMessage: state.debugMessage,
+      innerActionsDone: JSON.parse(JSON.stringify(state.innerActionsDone)),
+      floorClearResolved: state.floorClearResolved,
+      floorRewardClaimed: state.floorRewardClaimed,
     };
     const backupPlayer = JSON.parse(JSON.stringify(player));
     const backupEnemy = JSON.parse(JSON.stringify(enemy));
@@ -1285,7 +1319,9 @@
 
       const levelBeforeInner = player.level;
       enterInnerWorld();
-      results.enterInnerWorldDoesNotAutoClearOrLevel = state.gameState === 'innerWorld' && state.innerPhase === 'menu' && player.level === levelBeforeInner;
+      results.enterInnerWorldDoesNotAutoClearOrLevel = state.gameState === 'innerWorld' && state.innerPhase === 'rewardPick' && player.level === levelBeforeInner + 5;
+      results.autoFloorClearIncreasesLevel = player.level === levelBeforeInner + 5;
+      results.autoFloorClearRollsReward = state.rewardCandidates.length > 0;
 
       player.level = 1; player.int = 1; player.inner = 0; player.swordAura = 1; syncVitals();
       results.swordAuraMpModifierApplied = derived.maxMp === 0;
@@ -1442,7 +1478,8 @@
       player.inventory.push('기초 마법서');
       idx = player.inventory.length - 1;
       const magicSuccess = useInventoryItem(idx, { forceRoll: 1 });
-      results.useMagicBookSuccessRemovesBook = magicSuccess && !player.inventory.includes('기초 마법서') && player.knownMagic.includes('기초 마법서');
+      const learnedMagic = magicSuccess && magicSuccess.spellKey ? getMagicByKey(magicSuccess.spellKey) : null;
+      results.useMagicBookSuccessRemovesBook = !!magicSuccess && !player.inventory.includes('기초 마법서') && !!learnedMagic && player.knownMagic.includes(learnedMagic.key) && (!!player.selectedMagicKey);
 
       player.wis = 1;
       player.inventory.push('중급 마법서');
@@ -1673,19 +1710,18 @@
 
       state.gameState = 'innerWorld';
       enterInnerWorld();
-      results.enterInnerWorldStartsAtMenu = state.innerPhase === 'menu';
+      results.enterInnerWorldStartsAtMenu = state.innerPhase === 'rewardPick';
       renderPhasePanel();
-      const menuIds = ['btnClear','btnLvl','btnReward','btnStat','btnItem','btnShop','btnNext'];
+      const menuIds = ['btnReward','btnStat','btnItem','btnShop','btnNext'];
       results.innerWorldMenuButtonsBound = menuIds.every((id) => {
         const el = document.getElementById(id);
         return !!el && typeof el.onclick === 'function';
       });
       const levelBeforeTwice = player.level;
-      const menuLvlBtn = document.getElementById('btnLvl');
-      if (menuLvlBtn && typeof menuLvlBtn.onclick === 'function') menuLvlBtn.onclick();
+      autoResolveFloorClear();
       const afterFirst = player.level;
-      if (menuLvlBtn && typeof menuLvlBtn.onclick === 'function') menuLvlBtn.onclick();
-      results.innerWorldFiveLevelPlusOneTimeOnly = afterFirst === levelBeforeTwice + 5 && player.level === afterFirst;
+      autoResolveFloorClear();
+      results.innerWorldFiveLevelPlusOneTimeOnly = afterFirst === levelBeforeTwice && player.level === afterFirst;
       state.rewardCandidates = ['코인 +2', '외공서']; state.rewardSelected = new Set([0]); state.rewardMeta = { candidateCount: 2, pickCount: 1 };
       state.innerPhase = 'rewardPick';
       renderPhasePanel();
@@ -1695,7 +1731,7 @@
       state.innerPhase = 'menu'; renderPhasePanel();
       const rewardMenuBtn = document.getElementById('btnReward');
       if (rewardMenuBtn && typeof rewardMenuBtn.onclick === 'function') rewardMenuBtn.onclick();
-      results.innerWorldRewardNotInfinite = rewardDoneOnce && state.innerPhase === 'rewardPick';
+      results.innerWorldRewardNotInfinite = rewardDoneOnce && state.innerPhase === 'menu';
       state.gameState = 'battle';
       renderPhasePanel();
       const saveBtn = document.getElementById('saveGameBtn');
@@ -1778,6 +1814,9 @@
       state.shopMessage = backupState.shopMessage;
       state.saveMessage = backupState.saveMessage;
       state.debugMessage = backupState.debugMessage;
+      state.innerActionsDone = JSON.parse(JSON.stringify(backupState.innerActionsDone));
+      state.floorClearResolved = !!backupState.floorClearResolved;
+      state.floorRewardClaimed = !!backupState.floorRewardClaimed;
       if (backupLocalSave === null) localStorage.removeItem(SAVE_KEY);
       else localStorage.setItem(SAVE_KEY, backupLocalSave);
       transientNotice = backupTransientNotice;
@@ -1805,6 +1844,7 @@
       state.saveMessage === backupState.saveMessage &&
       player.level === backupPlayer.level && player.coin === backupPlayer.coin && player.hp === backupPlayer.hp && player.mp === backupPlayer.mp &&
       JSON.stringify(player.inventory) === JSON.stringify(backupPlayer.inventory) && JSON.stringify(player.knownMagic) === JSON.stringify(backupPlayer.knownMagic) &&
+      player.selectedMagicKey === backupPlayer.selectedMagicKey &&
       player.x === backupPlayer.x && player.y === backupPlayer.y && enemy.alive === backupEnemy.alive && enemy.hp === backupEnemy.hp &&
       enemy.maxHp === backupEnemy.maxHp && enemy.x === backupEnemy.x && enemy.y === backupEnemy.y &&
       derived.maxHp === backupDerived.maxHp && derived.maxMp === backupDerived.maxMp && derived.mpRegen === backupDerived.mpRegen &&
@@ -1820,7 +1860,7 @@
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY };
+  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY, SPELL_MP, SPELLS_BY_CIRCLE, MAGIC_POOL, spellCategory, spellManaCost, spellPowerRatio, spellPower, getMagicByKey, normalizeKnownMagic };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
