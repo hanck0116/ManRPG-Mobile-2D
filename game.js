@@ -688,6 +688,11 @@
     bindDebugButtons();
   }
 
+  function appendPanelControls() {
+    appendSaveControls();
+    appendDebugControls();
+  }
+
   function renderPhasePanel() {
     const notice = transientNotice.until > Date.now() ? `<div class="warn">${transientNotice.text}</div>` : '';
     if (state.gameState === 'initialStatAllocate') {
@@ -720,18 +725,18 @@
       phasePanel.querySelectorAll('.stat-minus').forEach(btn => btn.onclick = () => { decreaseStat(btn.dataset.key); renderPhasePanel(); });
       document.getElementById('recommendedInitialStats').onclick = () => { applyRecommendedInitialStats(); renderPhasePanel(); };
       document.getElementById('startFloorOneBattle').onclick = finishInitialStatAllocation;
-      appendSaveControls();
+      appendPanelControls();
       return;
     }
     if (state.gameState === 'battle') {
       phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적: ${enemy.name || '알 수 없음'}</div><div>설명: ${enemy.description || ''}</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div><div>적 공격력: ${enemy.atk}</div>${notice}`;
-      appendSaveControls();
+      appendPanelControls();
       return;
     }
     if (state.gameState === 'defeated') {
       phasePanel.innerHTML = '<div class="enemy">패배: HP가 0이 되어 전투에서 쓰러졌습니다.</div><button id="restartRun">처음부터 다시 시작</button>';
       document.getElementById('restartRun').onclick = restartFromDefeat;
-      appendSaveControls();
+      appendPanelControls();
       return;
     }
     const p = state.innerPhase;
@@ -833,8 +838,7 @@
       phasePanel.innerHTML = '<div>8) nextFloor</div><button id="goNext">다음 층 진입</button>';
       document.getElementById('goNext').onclick = goNextFloor;
     }
-    appendSaveControls();
-    appendDebugControls();
+    appendPanelControls();
   }
 
   function rectHit(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
@@ -1612,6 +1616,27 @@
         typeof saveBtn.onclick === 'function' && typeof loadBtn.onclick === 'function' && typeof deleteBtn.onclick === 'function';
       const debugBtn = document.getElementById('runDebugTestsBtn');
       results.debugTestButtonBoundAfterPhaseRender = !!debugBtn && typeof debugBtn.onclick === 'function';
+
+      state.gameState = 'initialStatAllocate';
+      renderPhasePanel();
+      const debugBtnInitial = document.getElementById('runDebugTestsBtn');
+      results.debugButtonBoundOnInitialStatPhase = !!debugBtnInitial && typeof debugBtnInitial.onclick === 'function';
+
+      state.gameState = 'battle';
+      renderPhasePanel();
+      const debugBtnBattle = document.getElementById('runDebugTestsBtn');
+      results.debugButtonBoundOnBattlePhase = !!debugBtnBattle && typeof debugBtnBattle.onclick === 'function';
+
+      state.gameState = 'defeated';
+      renderPhasePanel();
+      const debugBtnDefeated = document.getElementById('runDebugTestsBtn');
+      results.debugButtonBoundOnDefeatedPhase = !!debugBtnDefeated && typeof debugBtnDefeated.onclick === 'function';
+
+      state.gameState = 'innerWorld';
+      state.innerPhase = 'nextFloor';
+      renderPhasePanel();
+      const debugBtnInnerWorld = document.getElementById('runDebugTestsBtn');
+      results.debugButtonBoundOnInnerWorldPhase = !!debugBtnInnerWorld && typeof debugBtnInnerWorld.onclick === 'function';
 
       results.enemyTypesDefined = Array.isArray(enemyTypes) && enemyTypes.length === 5 &&
         enemyTypes.some(type => type.id === 'hungryWolf') && enemyTypes.some(type => type.id === 'goblin') &&
