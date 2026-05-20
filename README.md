@@ -37,6 +37,22 @@ window.ManRPG.runDebugTests()
   3. `전체 테스트 통과` 또는 실패 항목 확인
 - 브라우저 콘솔 방식(`window.ManRPG.runDebugTests()`)도 계속 사용할 수 있습니다.
 
+
+## 모바일 디버그 테스트 버튼 부착 안정화 v0.1
+- `appendPanelControls()`를 추가해 phasePanel 하단 컨트롤 부착을 공통화했습니다.
+  - 내부 순서: `appendSaveControls()` → `appendDebugControls()`
+- 다음 화면들에서 `저장/불러오기/저장 삭제` + `테스트 실행` 버튼이 함께 보이도록 수정했습니다.
+  - `initialStatAllocate`
+  - `battle`
+  - `defeated`
+  - `innerWorld` 전체 단계(`clearReset`, `fiveLevelPlus`, `rewardRoll`, `rewardPick`, `statAllocate`, `skillTechMagicTrait`, `shop`, `nextFloor`)
+- `runDebugTests()`에 대표 phasePanel 화면의 디버그 버튼 바인딩 확인 키를 추가했습니다.
+  - `debugButtonBoundOnInitialStatPhase`
+  - `debugButtonBoundOnBattlePhase`
+  - `debugButtonBoundOnDefeatedPhase`
+  - `debugButtonBoundOnInnerWorldPhase`
+- 기존 `debugTestButtonBoundAfterPhaseRender`, `debugTestsRestoreState` 키는 유지됩니다.
+
 ## runDebugTests() 반환 키 목록 (주요 키)
 - rewardConfigLooks1
 - attackFormulaDiv10
