@@ -26,6 +26,7 @@
     shopMessage: '',
     saveMessage: '',
     debugMessage: '',
+    innerActionsDone: { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false },
   };
 
   const player = {
@@ -590,7 +591,8 @@
     state.itemUseMessage = '';
     state.shopMessage = '';
     state.gameState = 'innerWorld';
-    state.innerPhase = 'clearReset';
+    state.innerPhase = 'menu';
+    state.innerActionsDone = { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false };
     resetInput();
     resetRewardState();
     transientNotice = { text: '', until: 0 };
@@ -607,6 +609,7 @@
     state.floor += 1;
     state.gameState = 'battle';
     state.innerPhase = null;
+    state.innerActionsDone = { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false };
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
@@ -634,25 +637,14 @@
       <div><span class="tag">이름</span>: ${player.name}</div>
       <div><span class="tag">칭호</span>: ${player.title}</div>
       <div><span class="tag">만트라</span>: ${player.mantra}</div>
-      <div><span class="tag">현재 상태</span>: ${state.gameState === 'battle' ? '전투' : (state.gameState === 'innerWorld' ? '심상세계' : (state.gameState === 'initialStatAllocate' ? '초기 스탯 분배' : '패배'))}</div>
+      <div><span class="tag">상태</span>: ${state.gameState === 'battle' ? '전투' : (state.gameState === 'innerWorld' ? '심상세계' : (state.gameState === 'initialStatAllocate' ? '초기 분배' : '패배'))}</div>
       <hr />
-      <div>층: ${state.floor} | 레벨: ${player.level} | 코인: ${player.coin}</div>
-      <div>남은 포인트: ${remainingPoints()} (총 ${totalStatPoints()}, 최대스탯 ${statMax()})</div>
-      <div>힘/민첩/체력/지능/지혜/외모: ${player.str}/${player.agi}/${player.vit}/${player.int}/${player.wis}/${player.looks}</div>
-      <div>HP: ${Math.floor(player.hp)} / ${derived.maxHp}</div>
-      <div>MP: ${Math.floor(player.mp)} / ${derived.maxMp}</div>
-      <div>검기 MP 보정: ${derived.auraMpMod >= 0 ? '+' : ''}${derived.auraMpMod}</div>
-      <div>MP 회복량: ${derived.mpRegen}</div>
-      <div>기본 평타: ${derived.baseAtk}</div>
-      <div>최종 평타: ${derived.atk}</div>
-      <div>외공/내공/검기/멀티캐스팅: ${player.outer}/${player.inner}/${player.swordAura}/${player.multicasting}</div>
-      <div>스킬 CD: ${player.skillCooldown.toFixed(1)} | 마법 CD: ${player.magicCooldown.toFixed(1)}</div>
-      <div class="enemy">적: ${enemy.name || '알 수 없음'}</div>
-      <div>${enemy.description || ''}</div>
-      <div class="enemy">적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>
-      <div>적 공격력: ${enemy.atk}</div>
-      <div>인벤토리 수: ${player.inventory.length}</div>
-      <div>인벤토리: ${player.inventory.length ? player.inventory.join(', ') : '없음'}</div>
+      <div>층 ${state.floor} | Lv ${player.level} | 코인 ${player.coin}</div>
+      <div>HP ${Math.floor(player.hp)} / ${derived.maxHp} | MP ${Math.floor(player.mp)} / ${derived.maxMp}</div>
+      <div>스탯 힘/민/체/지/혜/외: ${player.str}/${player.agi}/${player.vit}/${player.int}/${player.wis}/${player.looks}</div>
+      <div>공격 ${derived.atk} | 검기 ${player.swordAura} | 멀캐 ${player.multicasting}</div>
+      <div class="enemy">적 ${enemy.name || '알 수 없음'} | HP ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>
+      <div>인벤 ${player.inventory.length}개 ${player.inventory.length ? '(' + player.inventory.join(', ') + ')' : ''}</div>
     `;
   }
 
@@ -740,18 +732,31 @@
       return;
     }
     const p = state.innerPhase;
-    if (p === 'clearReset') {
-      phasePanel.innerHTML = '<div>1) clearReset 단계</div><button id="btnClear">Clear Reset 실행</button>';
-      document.getElementById('btnClear').onclick = () => { clearReset(); state.innerPhase='fiveLevelPlus'; };
-    } else if (p === 'fiveLevelPlus') {
-      phasePanel.innerHTML = '<div>2) fiveLevelPlus 단계</div><button id="btnLvl">+5 레벨 적용</button>';
-      document.getElementById('btnLvl').onclick = () => { applyFiveLevelPlus(); state.innerPhase='rewardRoll'; };
-    } else if (p === 'rewardRoll') {
-      phasePanel.innerHTML = '<div>3) rewardRoll 단계</div><button id="btnRoll">보상 굴리기</button>';
-      document.getElementById('btnRoll').onclick = () => { rewardRoll(); state.innerPhase='rewardPick'; };
+    if (p === 'menu' || !p) {
+      const action = state.innerActionsDone;
+      const rewardStatus = action.rewardConfirmed ? '완료' : (state.rewardCandidates.length ? '선택중' : '대기');
+      phasePanel.innerHTML = `<div><b>심상세계 메뉴</b></div>
+      <div class="stat-actions">
+        <button id="btnClear" ${action.clearReset ? 'disabled' : ''}>정비 ${action.clearReset ? '완료' : ''}</button>
+        <button id="btnLvl" ${action.fiveLevelPlus ? 'disabled' : ''}>+5레벨 ${action.fiveLevelPlus ? '완료' : ''}</button>
+        <button id="btnReward">보상 ${rewardStatus}</button>
+        <button id="btnStat">스탯</button>
+        <button id="btnItem">아이템</button>
+        <button id="btnShop">상점</button>
+        <button id="btnNext">다음 층</button>
+      </div>${notice}`;
+      const clearBtn=document.getElementById('btnClear');
+      if(clearBtn) clearBtn.onclick=()=>{ if(state.innerActionsDone.clearReset)return; clearReset(); state.innerActionsDone.clearReset=true; transientNotice={text:'정비 완료',until:Date.now()+1200}; renderPhasePanel(); };
+      const lvlBtn=document.getElementById('btnLvl');
+      if(lvlBtn) lvlBtn.onclick=()=>{ if(state.innerActionsDone.fiveLevelPlus)return; applyFiveLevelPlus(); state.innerActionsDone.fiveLevelPlus=true; transientNotice={text:'레벨 +5',until:Date.now()+1200}; renderPhasePanel(); };
+      document.getElementById('btnReward').onclick=()=>{ if(!state.rewardCandidates.length&&!state.innerActionsDone.rewardConfirmed) rewardRoll(); state.innerPhase='rewardPick'; renderPhasePanel(); };
+      document.getElementById('btnStat').onclick=()=>{ state.innerPhase='statAllocate'; renderPhasePanel(); };
+      document.getElementById('btnItem').onclick=()=>{ state.innerPhase='skillTechMagicTrait'; renderPhasePanel(); };
+      document.getElementById('btnShop').onclick=()=>{ state.innerPhase='shop'; renderPhasePanel(); };
+      document.getElementById('btnNext').onclick=goNextFloor;
     } else if (p === 'rewardPick') {
       const picks = [...state.rewardSelected];
-      phasePanel.innerHTML = `<div>4) rewardPick (${picks.length}/${state.rewardMeta.pickCount})</div>` +
+      phasePanel.innerHTML = `<div><b>보상 선택</b> (${picks.length}/${state.rewardMeta.pickCount})</div>` +
         state.rewardCandidates.map((r,i)=>`<button class="pick" data-idx="${i}">${state.rewardSelected.has(i)?'✅':''}${r}</button>`).join('') +
         '<div><button id="confirmReward">보상 확정</button></div>';
       phasePanel.querySelectorAll('.pick').forEach(btn=>btn.onclick=()=>{
@@ -763,7 +768,7 @@
       document.getElementById('confirmReward').onclick = () => {
         if (state.rewardSelected.size !== state.rewardMeta.pickCount) return;
         [...state.rewardSelected].forEach(i => applyReward(state.rewardCandidates[i]));
-        state.innerPhase = 'statAllocate';
+        state.innerActionsDone.rewardConfirmed = true; transientNotice = { text: '보상 확정', until: Date.now() + 1200 }; state.innerPhase = 'menu';
       };
     } else if (p === 'statAllocate') {
       ensureStatAllocationBase();
@@ -776,7 +781,7 @@
         ['looks', '외모'],
       ];
       const canIncreaseAny = remainingPoints() > 0;
-      phasePanel.innerHTML = `<div>5) statAllocate</div>
+      phasePanel.innerHTML = `<div><b>스탯 분배</b></div>
         <div>남은 포인트: ${remainingPoints()}</div>
         <div>총 스탯 포인트: ${totalStatPoints()}</div>
         <div>스탯 최대치: ${statMax()}</div>
@@ -811,9 +816,9 @@
         ? player.inventory.map((item, i) => `<div class="stat-row"><span>${item}</span><div><button class="use-item" data-idx="${i}">사용</button></div></div>`).join('')
         : '<div>보유 아이템 없음</div>';
       const msg = state.itemUseMessage ? `<div class="stat-message">${state.itemUseMessage}</div>` : '';
-      phasePanel.innerHTML = `<div>6) skillTechMagicTrait</div><div>보유 아이템을 사용하거나 다음 단계로 넘어갈 수 있습니다.</div>${msg}<div class="stat-grid">${inventoryRows}</div><button id="goShop">처리 완료 / 상점으로 이동</button>`;
+      phasePanel.innerHTML = `<div><b>아이템 사용</b></div>${msg}<div class="stat-grid">${inventoryRows}</div><button id="goShop">메뉴로</button>`;
       phasePanel.querySelectorAll('.use-item').forEach(btn => btn.onclick = () => { useInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
-      document.getElementById('goShop').onclick = () => { state.itemUseMessage = ''; state.innerPhase='shop'; };
+      document.getElementById('goShop').onclick = () => { state.itemUseMessage = ''; state.innerPhase='menu'; renderPhasePanel(); };
     } else if (p === 'shop') {
       const shopItems = getShopItems();
       const shopMessage = state.shopMessage ? `<div class="stat-message">${state.shopMessage}</div>` : '';
@@ -830,10 +835,10 @@
           return `<div class="stat-row"><span>${item} (${sellPrice}코인)</span><div><button class="shop-sell" data-idx="${i}">판매</button></div></div>`;
         }).join('')
         : '<div>판매 가능한 아이템이 없습니다.</div>';
-      phasePanel.innerHTML = `<div>7) shop</div><div>현재 코인: ${player.coin}</div><div>보유 인벤토리 수: ${player.inventory.length}</div>${shopMessage}<div class="stat-message">구매 목록</div><div class="stat-grid">${buyRows}</div><div class="stat-message">인벤토리 판매 목록</div><div class="stat-grid">${sellRows}</div><button id="closeShop">상점 종료 / 다음 층 준비</button>`;
+      phasePanel.innerHTML = `<div><b>상점</b></div><div>코인: ${player.coin}</div><div>인벤토리: ${player.inventory.length}개</div>${shopMessage}<div class="stat-message">구매 목록</div><div class="stat-grid">${buyRows}</div><div class="stat-message">인벤토리 판매 목록</div><div class="stat-grid">${sellRows}</div><button id="closeShop">메뉴로</button>`;
       phasePanel.querySelectorAll('.shop-buy').forEach(btn => btn.onclick = () => { buyShopItem(btn.dataset.name); renderPhasePanel(); });
       phasePanel.querySelectorAll('.shop-sell').forEach(btn => btn.onclick = () => { sellInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
-      document.getElementById('closeShop').onclick = () => { state.shopMessage = ''; state.innerPhase = 'nextFloor'; };
+      document.getElementById('closeShop').onclick = () => { state.shopMessage = ''; state.innerPhase = 'menu'; };
     } else if (p === 'nextFloor') {
       phasePanel.innerHTML = '<div>8) nextFloor</div><button id="goNext">다음 층 진입</button>';
       document.getElementById('goNext').onclick = goNextFloor;
@@ -967,6 +972,7 @@
     state.floor = 1;
     state.gameState = 'initialStatAllocate';
     state.innerPhase = null;
+    state.innerActionsDone = { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false };
     resetRewardState();
     resetInput();
     transientNotice = { text: '', until: 0 };
@@ -1206,7 +1212,7 @@
 
       state.gameState = 'battle'; enemy.alive = true; enemy.hp = 1;
       applyEnemyDamage(2, 0, 'test');
-      results.enemyKillToInnerWorld = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset' && enemy.alive === false;
+      results.enemyKillToInnerWorld = state.gameState === 'innerWorld' && state.innerPhase === 'menu' && enemy.alive === false;
 
       const c0 = player.coin; applyReward('추가 코인 +2'); results.rewardApplyCoin = player.coin === c0 + 2;
       const inv0 = player.inventory.length; applyReward('외공서'); results.rewardApplyInventory = player.inventory.length === inv0 + 1;
@@ -1221,7 +1227,7 @@
 
       const levelBeforeInner = player.level;
       enterInnerWorld();
-      results.enterInnerWorldDoesNotAutoClearOrLevel = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset' && player.level === levelBeforeInner;
+      results.enterInnerWorldDoesNotAutoClearOrLevel = state.gameState === 'innerWorld' && state.innerPhase === 'menu' && player.level === levelBeforeInner;
 
       player.level = 1; player.int = 1; player.inner = 0; player.swordAura = 1; syncVitals();
       results.swordAuraMpModifierApplied = derived.maxMp === 0;
@@ -1517,7 +1523,7 @@
       state.gameState = 'battle'; state.innerPhase = null; enemy.alive = true; enemy.hp = 1; clearCombatFeedback();
       applyEnemyDamage(5, 0, 'test');
       const stableAfterRepeatDefeat = handleEnemyDefeated('test') === false;
-      results.enemyDefeatEntersInnerWorldOnce = state.gameState === 'innerWorld' && state.innerPhase === 'clearReset' && enemy.alive === false && stableAfterRepeatDefeat;
+      results.enemyDefeatEntersInnerWorldOnce = state.gameState === 'innerWorld' && state.innerPhase === 'menu' && enemy.alive === false && stableAfterRepeatDefeat;
 
       state.gameState = 'battle'; state.innerPhase = null; resetInput(); clearCombatFeedback(); enemy.alive = true; enemy.hp = 100; enemy.hurtTimer = 0; enemy.x = player.x + 40; enemy.y = player.y;
       keys.attack = true; player.attackCooldown = 0; player.facing = 1;
@@ -1542,8 +1548,8 @@
       state.innerPhase = 'shop';
       state.shopMessage = '테스트';
       state.shopMessage = '';
-      state.innerPhase = 'nextFloor';
-      results.shopExitAdvancesToNextFloor = state.innerPhase === 'nextFloor' && state.shopMessage === '';
+      state.innerPhase = 'menu';
+      results.shopExitReturnsToMenu = state.innerPhase === 'menu' && state.shopMessage === '';
 
 
       state.gameState = 'initialStatAllocate';
@@ -1606,6 +1612,32 @@
       if (shopBuyButton && typeof shopBuyButton.onclick === 'function') shopBuyButton.onclick();
       results.shopButtonsRemainBoundAfterSaveControls = player.inventory.length > inventoryBeforeBuy;
 
+
+      state.gameState = 'innerWorld';
+      enterInnerWorld();
+      results.enterInnerWorldStartsAtMenu = state.innerPhase === 'menu';
+      renderPhasePanel();
+      const menuIds = ['btnClear','btnLvl','btnReward','btnStat','btnItem','btnShop','btnNext'];
+      results.innerWorldMenuButtonsBound = menuIds.every((id) => {
+        const el = document.getElementById(id);
+        return !!el && typeof el.onclick === 'function';
+      });
+      const levelBeforeTwice = player.level;
+      const menuLvlBtn = document.getElementById('btnLvl');
+      if (menuLvlBtn && typeof menuLvlBtn.onclick === 'function') menuLvlBtn.onclick();
+      const afterFirst = player.level;
+      if (menuLvlBtn && typeof menuLvlBtn.onclick === 'function') menuLvlBtn.onclick();
+      results.innerWorldFiveLevelPlusOneTimeOnly = afterFirst === levelBeforeTwice + 5 && player.level === afterFirst;
+      state.rewardCandidates = ['코인 +2', '외공서']; state.rewardSelected = new Set([0]); state.rewardMeta = { candidateCount: 2, pickCount: 1 };
+      state.innerPhase = 'rewardPick';
+      renderPhasePanel();
+      const confirmRewardBtn = document.getElementById('confirmReward');
+      if (confirmRewardBtn && typeof confirmRewardBtn.onclick === 'function') confirmRewardBtn.onclick();
+      const rewardDoneOnce = state.innerActionsDone.rewardConfirmed === true;
+      state.innerPhase = 'menu'; renderPhasePanel();
+      const rewardMenuBtn = document.getElementById('btnReward');
+      if (rewardMenuBtn && typeof rewardMenuBtn.onclick === 'function') rewardMenuBtn.onclick();
+      results.innerWorldRewardNotInfinite = rewardDoneOnce && state.innerPhase === 'rewardPick';
       state.gameState = 'battle';
       renderPhasePanel();
       const saveBtn = document.getElementById('saveGameBtn');
@@ -1633,7 +1665,7 @@
       results.debugButtonBoundOnDefeatedPhase = !!debugBtnDefeated && typeof debugBtnDefeated.onclick === 'function';
 
       state.gameState = 'innerWorld';
-      state.innerPhase = 'nextFloor';
+      state.innerPhase = 'menu';
       renderPhasePanel();
       const debugBtnInnerWorld = document.getElementById('runDebugTestsBtn');
       results.debugButtonBoundOnInnerWorldPhase = !!debugBtnInnerWorld && typeof debugBtnInnerWorld.onclick === 'function';
