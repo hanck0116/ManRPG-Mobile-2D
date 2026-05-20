@@ -416,3 +416,25 @@ window.ManRPG.runDebugTests()
 - skill 버튼 입력은 `useSelectedSkill()`로 통합되어 선택 스킬을 사용하며, 미보유/잘못된 선택값은 `harvest_slash`로 자동 복구됩니다.
 - 저장/불러오기(`serializeGameState`, `applySerializedGameState`)에 `knownSkills`, `selectedSkillKey`를 포함했습니다.
 - runDebugTests 신규 키: skillPoolDefined, defaultKnownSkillIncludesHarvestSlash, normalizeKnownSkillsRestoresHarvestSlash, selectedSkillDefaultsSafely, skillCraftPhaseRenders, skillCraftButtonCreatesSkill, skillCraftConsumesCoin, skillCraftPreventsDuplicate, skillCraftFailsWithoutCoin, skillCraftFailsWithoutLevel, quickSlotSkillTabUsesKnownSkills, quickSlotSkillSelectsSelectedSkill, skillOverlayShowsKnownSkills, selectedSkillUsesMp, selectedSkillAppliesCooldown, selectedSkillDamagesEnemy, selectedSkillFailsWithoutMp, selectedSkillFallbacksToHarvestSlash, knownSkillsSaveLoadRoundTrip, selectedSkillSaveLoadRoundTrip.
+
+## 스킬 제작 시스템 안정화 v0.1
+- HUD에 선택 스킬/선택 마법을 함께 표시해 현재 장착 상태를 전투 중 즉시 확인할 수 있게 했습니다.
+- `state.skillCraftMessage`를 추가해 스킬 제작 화면에서 성공/실패/선택 메시지를 안정적으로 표시합니다.
+- `craftSkill()` 메시지 처리를 `showBattleNotice()` 의존에서 분리하고 `skillCraftMessage` 중심으로 변경했습니다.
+- skillCraft UI를 간소화해 각 행을 `스킬명 / MP / CD / 비용 / Lv / 상태` 중심으로 표시하고 제작 불가 사유(보유중/Lv 부족/코인 부족)를 짧게 노출합니다.
+- quickSlot 스킬 탭에서 선택 시 HUD와 함께 피드백(전투: 전투 알림, 심상세계: skillCraftMessage)이 갱신됩니다.
+- `normalizeKnownSkills()` 호출 지점을 HUD, quickSlotTray, useSelectedSkill, skillCraft 진입에 보강해 `selectedSkillKey` 복구 안정성을 강화했습니다.
+- 패배 후 재시작 시 `knownSkills=['harvest_slash']`, `selectedSkillKey='harvest_slash'`로 초기화되며, load 이후에도 normalize 경로를 유지합니다.
+- runDebugTests 확장 키:
+  - hudShowsSelectedSkill
+  - skillCraftMessageShowsSuccess
+  - skillCraftMessageShowsDuplicate
+  - skillCraftMessageShowsNoCoin
+  - skillCraftMessageShowsNoLevel
+  - skillCraftSelectUpdatesMessage
+  - skillCraftUiUsesCompactRows
+  - quickSlotSkillSelectionUpdatesHud
+  - quickSlotSkillSelectionDoesNotCast
+  - selectedSkillInvalidKeyFallsBack
+  - restartResetsKnownSkills
+  - loadNormalizesKnownSkills
