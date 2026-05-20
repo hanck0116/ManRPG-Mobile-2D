@@ -52,6 +52,7 @@
     attackCooldown: 0, dashCooldown: 0, facing: 1,
     skillCooldown: 0, magicCooldown: 0,
     invincibleTimer: 0, hurtTimer: 0,
+    knownSkills: ['harvest_slash'], selectedSkillKey: 'harvest_slash',
     knownMagic: [], selectedMagicKey: '', inventory: []
   };
 
@@ -156,6 +157,23 @@
   function getSpellEffect(key){ return SPELL_EFFECTS[key] || { effectType:['damage'], element:'neutral', duration:1.2, multiplier:1 }; }
   function getMagicByKey(key){return MAGIC_POOL.find((m)=>m.key===key);}
   function normalizeKnownMagic(){player.knownMagic=player.knownMagic.filter((k)=>typeof k==='string'&&!!getMagicByKey(k)); if(!player.selectedMagicKey||!getMagicByKey(player.selectedMagicKey)){player.selectedMagicKey=player.knownMagic[0]||'';} }
+  const SKILL_POOL = [
+    { key:'harvest_slash', name:'수확 베기', type:'attack', mp:20, cooldown:1.2, powerMul:2, range:95, knockback:35, description:'기본 수확 낫 베기', tags:['basic'], craftCost:0, requiredLevel:1 },
+    { key:'quick_slash', name:'속공 베기', type:'attack', mp:3, cooldown:0.6, powerMul:1.2, range:65, knockback:20, description:'빠르게 연계하는 베기', tags:['quick'], craftCost:3, requiredLevel:1 },
+    { key:'heavy_cut', name:'강타 베기', type:'attack', mp:7, cooldown:1.8, powerMul:2.8, range:88, knockback:50, description:'느리지만 강한 일격', tags:['heavy'], craftCost:6, requiredLevel:3 },
+    { key:'dash_cut', name:'돌진 베기', type:'dash', mp:6, cooldown:1.5, powerMul:1.8, range:115, knockback:30, description:'짧게 돌진 후 베기', tags:['dash'], craftCost:6, requiredLevel:2 },
+    { key:'guard_break', name:'방어 파쇄', type:'break', mp:5, cooldown:1.4, powerMul:1.6, range:90, knockback:28, description:'적의 공격 템포를 무너뜨림', tags:['break'], craftCost:6, requiredLevel:2 },
+    { key:'aerial_cut', name:'공중 베기', type:'aerial', mp:5, cooldown:1.1, powerMul:1.7, range:92, knockback:32, description:'점프 중 강화되는 베기', tags:['aerial'], craftCost:6, requiredLevel:2 },
+    { key:'focus_cut', name:'집중 베기', type:'focus', mp:8, cooldown:1.6, powerMul:2.2, range:100, knockback:36, description:'MP를 모아 날리는 집중 일격', tags:['focus'], craftCost:6, requiredLevel:4 },
+    { key:'wide_sweep', name:'휩쓸기', type:'area', mp:6, cooldown:1.3, powerMul:1.5, range:120, knockback:24, description:'넓게 휘둘러 적을 가격', tags:['area'], craftCost:6, requiredLevel:3 },
+  ];
+  function getSkillByKey(key){ return SKILL_POOL.find((s)=>s.key===key); }
+  function normalizeKnownSkills(){
+    const set = new Set((Array.isArray(player.knownSkills) ? player.knownSkills : []).filter((k)=>typeof k==='string'&&!!getSkillByKey(k)));
+    set.add('harvest_slash');
+    player.knownSkills = [...set];
+    if (!player.selectedSkillKey || !set.has(player.selectedSkillKey)) player.selectedSkillKey = 'harvest_slash';
+  }
 
   function totalStatPoints() { return 60 + (player.level - 1) * 3; }
   function spentStats() { return player.str+player.agi+player.vit+player.int+player.wis+player.looks; }
@@ -550,6 +568,7 @@
         x: player.x, y: player.y, vx: player.vx, vy: player.vy, hp: player.hp, mp: player.mp,
         attackCooldown: player.attackCooldown, dashCooldown: player.dashCooldown, facing: player.facing,
         skillCooldown: player.skillCooldown, magicCooldown: player.magicCooldown,
+        knownSkills: [...player.knownSkills], selectedSkillKey: player.selectedSkillKey,
         knownMagic: [...player.knownMagic], selectedMagicKey: player.selectedMagicKey, inventory: [...player.inventory],
       },
       enemy: {
@@ -591,8 +610,11 @@
 
       Object.assign(player, p);
       player.inventory = [...p.inventory];
+      player.knownSkills = Array.isArray(p.knownSkills) ? [...p.knownSkills] : ['harvest_slash'];
+      player.selectedSkillKey = typeof p.selectedSkillKey === 'string' ? p.selectedSkillKey : 'harvest_slash';
       player.knownMagic = [...p.knownMagic];
       player.selectedMagicKey = typeof p.selectedMagicKey === 'string' ? p.selectedMagicKey : '';
+      normalizeKnownSkills();
       normalizeKnownMagic();
 
       Object.assign(enemy, e);
@@ -821,7 +843,7 @@
   }
 
   function getQuickSlotItems() {
-    if (state.quickSlotTab === 'skill') return [{ key: 'harvest_slash', name: '수확 베기', circle: '-', mp: 0, category: 'attack' }];
+    if (state.quickSlotTab === 'skill') return player.knownSkills.map((k)=>getSkillByKey(k)).filter(Boolean);
     return player.knownMagic.map((k) => getMagicByKey(k)).filter(Boolean);
   }
 
@@ -836,10 +858,10 @@
     const pageSize = 4; const pages = Math.max(1, Math.ceil(items.length / pageSize));
     state.quickSlotPage = Math.max(0, Math.min(state.quickSlotPage, pages - 1));
     const pageItems = items.slice(state.quickSlotPage * pageSize, state.quickSlotPage * pageSize + pageSize);
-    const emptyText = state.quickSlotTab === 'magic' && !items.length ? '<div class="stat-message">보유 마법 없음</div>' : '';
+    const emptyText = !items.length ? `<div class="stat-message">보유 ${state.quickSlotTab==='skill'?'스킬':'마법'} 없음</div>` : '';
     quickSlotTrayEl.innerHTML = state.quickSlotCollapsed
       ? `<div class="slot-tabs"><button id="toggleTray" style="margin-left:auto">${state.quickSlotTab==='skill'?'퀵슬롯 ▲':'스킬/마법 ▲'}</button></div>`
-      : `<div class="slot-tabs"><span>퀵슬롯</span><button id="slotSkillTab">스킬</button><button id="slotMagicTab">마법</button><button id="toggleTray" style="margin-left:auto">접기 ▼</button></div>${emptyText}<div class="slot-grid">${(pageItems.length?pageItems:[null]).map((item)=> item ? `<button class="slot quick-slot-btn ${player.selectedMagicKey===item.key?'selected':''}" data-key="${item.key}">${item.name}<br>${item.circle !== '-' ? `C${item.circle} MP${item.mp}` : '전용'}</button>` : '<button class="slot" disabled>빈</button>').join('')}</div><div class="slot-page"><button id="slotPrev">◀</button><span>${state.quickSlotPage+1} / ${pages}</span><button id="slotNext">▶</button></div>`;
+      : `<div class="slot-tabs"><span>퀵슬롯</span><button id="slotSkillTab">스킬</button><button id="slotMagicTab">마법</button><button id="toggleTray" style="margin-left:auto">접기 ▼</button></div>${emptyText}<div class="slot-grid">${(pageItems.length?pageItems:[null]).map((item)=> item ? `<button class="slot quick-slot-btn ${(state.quickSlotTab==='skill'?player.selectedSkillKey:player.selectedMagicKey)===item.key?'selected':''}" data-key="${item.key}">${item.name}<br>${state.quickSlotTab==='skill' ? `MP${item.mp} CD${item.cooldown}` : `C${item.circle} MP${item.mp}`}</button>` : '<button class="slot" disabled>빈</button>').join('')}</div><div class="slot-page"><button id="slotPrev">◀</button><span>${state.quickSlotPage+1} / ${pages}</span><button id="slotNext">▶</button></div>`;
     const slotSkillTab = document.getElementById('slotSkillTab');
     const slotMagicTab = document.getElementById('slotMagicTab');
     if (slotSkillTab) slotSkillTab.onclick = ()=>{state.quickSlotTab='skill';state.quickSlotPage=0;renderQuickSlotTray();};
@@ -848,7 +870,7 @@
     const prev=document.getElementById('slotPrev'); const next=document.getElementById('slotNext');
     if(prev) prev.onclick=()=>{state.quickSlotPage=Math.max(0,state.quickSlotPage-1);renderQuickSlotTray();};
     if(next) next.onclick=()=>{state.quickSlotPage=Math.min(pages-1,state.quickSlotPage+1);renderQuickSlotTray();};
-    quickSlotTrayEl.querySelectorAll('.quick-slot-btn').forEach((btn)=>btn.onclick=()=>{if(state.quickSlotTab==='magic'){player.selectedMagicKey=btn.dataset.key;} renderQuickSlotTray(); renderHUD();});
+    quickSlotTrayEl.querySelectorAll('.quick-slot-btn').forEach((btn)=>btn.onclick=()=>{if(state.quickSlotTab==='magic'){player.selectedMagicKey=btn.dataset.key;} else {player.selectedSkillKey=btn.dataset.key;} renderQuickSlotTray(); renderHUD();});
   }
 
     function renderPhasePanel() {
@@ -910,10 +932,11 @@
       <div class="stat-actions inner-world-menu-grid">
         <button id="btnReward">${state.floorRewardClaimed ? "보상 완료" : "보상"}</button>
         <button id="btnStat">스탯</button>
+        <button id="btnSkill">스킬</button>
         <button id="btnItem">아이템</button>
         <button id="btnShop">상점</button>
         <button id="btnNext">다음 층</button>
-      </div><div>선택 마법: ${(getMagicByKey(player.selectedMagicKey)||{name:'없음',circle:'-',mp:0}).name} / C${(getMagicByKey(player.selectedMagicKey)||{circle:'-'}).circle} / MP ${(getMagicByKey(player.selectedMagicKey)||{mp:0}).mp} | 인벤 ${player.inventory.length}개</div>${notice}`;
+      </div><div>선택 스킬: ${(getSkillByKey(player.selectedSkillKey)||{name:'수확 베기'}).name} | 선택 마법: ${(getMagicByKey(player.selectedMagicKey)||{name:'없음',circle:'-',mp:0}).name} / C${(getMagicByKey(player.selectedMagicKey)||{circle:'-'}).circle} / MP ${(getMagicByKey(player.selectedMagicKey)||{mp:0}).mp} | 인벤 ${player.inventory.length}개</div>${notice}`;
       const btnReward = document.getElementById('btnReward');
       if (btnReward) {
         btnReward.disabled = !!state.floorRewardClaimed;
@@ -923,6 +946,7 @@
         };
       }
       document.getElementById('btnStat').onclick=()=>{ state.innerPhase='statAllocate'; renderPhasePanel(); };
+      document.getElementById('btnSkill').onclick=()=>{ state.innerPhase='skillCraft'; renderPhasePanel(); };
       document.getElementById('btnItem').onclick=()=>{ state.innerPhase='skillTechMagicTrait'; renderPhasePanel(); };
       document.getElementById('btnShop').onclick=()=>{ state.innerPhase='shop'; renderPhasePanel(); };
       document.getElementById('btnNext').onclick=goNextFloor;
@@ -998,6 +1022,18 @@
       phasePanel.querySelectorAll('.use-item').forEach(btn => btn.onclick = () => { useInventoryItem(Number(btn.dataset.idx)); renderPhasePanel(); });
       const magicSelect = document.getElementById('magicSelect'); if (magicSelect) magicSelect.onchange = () => { player.selectedMagicKey = magicSelect.value; renderPhasePanel(); };
       document.getElementById('goShop').onclick = () => { state.itemUseMessage = ''; state.innerPhase='menu'; renderPhasePanel(); };
+    } else if (p === 'skillCraft') {
+      normalizeKnownSkills();
+      const selectedSkill = getSkillByKey(player.selectedSkillKey) || getSkillByKey('harvest_slash');
+      const skillRows = SKILL_POOL.map((s) => {
+        const owned = player.knownSkills.includes(s.key);
+        const canCraft = !owned && player.level >= s.requiredLevel && player.coin >= s.craftCost && s.craftCost > 0;
+        return `<div class="stat-row"><span>${s.name} (MP ${s.mp}/CD ${s.cooldown})<br>${s.description}<br>비용 ${s.craftCost}코인 / Lv ${s.requiredLevel}</span><div><button class="skill-select" data-key="${s.key}" ${owned?'':'disabled'}>선택</button><button class="skill-craft" data-key="${s.key}" ${canCraft?'':'disabled'}>${owned?'보유중':'제작'}</button></div></div>`;
+      }).join('');
+      phasePanel.innerHTML = `<div><b>스킬 제작</b></div><div>코인 ${player.coin} | 보유 스킬 ${player.knownSkills.length} | 선택 스킬 ${selectedSkill.name}</div><div class="stat-grid">${skillRows}</div><button id="skillCraftBack">메뉴로</button>`;
+      phasePanel.querySelectorAll('.skill-select').forEach((btn)=>btn.onclick=()=>{ player.selectedSkillKey = btn.dataset.key; renderPhasePanel(); renderHUD(); renderQuickSlotTray();});
+      phasePanel.querySelectorAll('.skill-craft').forEach((btn)=>btn.onclick=()=>{ craftSkill(btn.dataset.key); renderPhasePanel(); renderHUD(); renderQuickSlotTray();});
+      document.getElementById('skillCraftBack').onclick = ()=>{ state.innerPhase='menu'; renderPhasePanel(); };
     } else if (p === 'shop') {
       const shopItems = getShopItems();
       const shopMessage = state.shopMessage ? `<div class="stat-message">${state.shopMessage}</div>` : '';
@@ -1109,17 +1145,33 @@
   }
 
   function useHarvestSlash() {
-    if (state.gameState !== 'battle' || !enemy.alive) return;
-    if (player.skillCooldown > 0) return showBattleNotice('스킬 재사용 대기 중입니다.');
-    if (player.mp < 20) return showBattleNotice('MP가 부족합니다.');
-    player.mp -= 20;
-    player.skillCooldown = 1.2;
-    showBattleNotice('수확 베기!');
-    const range = 95;
-    const inFront = player.facing === 1 ? (enemy.x - (player.x + player.w) <= range && enemy.x >= player.x) : (player.x - (enemy.x + enemy.w) <= range && enemy.x <= player.x);
-    if (inFront && Math.abs(enemy.y - player.y) <= 70) {
-      applyEnemyDamage(derived.atk * 2, 35, 'harvestSlash');
-    }
+    return applySkillEffect(getSkillByKey('harvest_slash'));
+  }
+  function craftSkill(skillKey){
+    const skill = getSkillByKey(skillKey); if (!skill) return false;
+    if (player.knownSkills.includes(skill.key)) return showBattleNotice('이미 보유한 스킬'), false;
+    if (player.level < skill.requiredLevel) return showBattleNotice('레벨 부족'), false;
+    if (player.coin < skill.craftCost) return showBattleNotice('코인 부족'), false;
+    player.coin -= skill.craftCost; player.knownSkills.push(skill.key); normalizeKnownSkills();
+    transientNotice = { text: `스킬 제작 완료: ${skill.name}`, until: Date.now() + 1500 };
+    return true;
+  }
+  function useSelectedSkill(){ return applySkillEffect(getSkillByKey(player.selectedSkillKey || 'harvest_slash')); }
+  function applySkillEffect(skill){
+    normalizeKnownSkills();
+    const selected = skill && player.knownSkills.includes(skill.key) ? skill : getSkillByKey('harvest_slash');
+    if (state.gameState !== 'battle' || !enemy.alive) return false;
+    if (player.skillCooldown > 0) return showBattleNotice('스킬 재사용 대기 중'), false;
+    if (player.mp < selected.mp) return showBattleNotice('MP 부족'), false;
+    if (selected.key === 'dash_cut') player.x = Math.max(0, Math.min(canvas.width - player.w, player.x + (player.facing * 40)));
+    player.mp -= selected.mp; player.skillCooldown = selected.cooldown; showBattleNotice(`${selected.name}!`);
+    const inFront = player.facing === 1 ? (enemy.x - (player.x + player.w) <= selected.range && enemy.x >= player.x) : (player.x - (enemy.x + enemy.w) <= selected.range && enemy.x <= player.x);
+    if (!inFront || Math.abs(enemy.y - player.y) > 70) return true;
+    let dmg = derived.atk * selected.powerMul;
+    if (selected.key === 'aerial_cut' && (Math.abs(player.vy) > 1 || player.y < 279)) dmg *= 1.35;
+    applyEnemyDamage(dmg, selected.knockback, selected.key === 'harvest_slash' ? 'harvestSlash' : 'skill');
+    if (selected.key === 'guard_break') enemy.attackCd = Math.max(enemy.attackCd, 1.2);
+    return true;
   }
 
   function applyMagicEffect(selected) {
@@ -1229,7 +1281,7 @@
       hitStopTimer = Math.max(0, hitStopTimer - dt);
       return;
     }
-    if (keys.skill) { useHarvestSlash(); keys.skill = false; }
+    if (keys.skill) { useSelectedSkill(); keys.skill = false; }
     if (keys.magic) { castSelectedMagic(); keys.magic = false; }
     const speed = 230;
     if (keys.left) { player.vx = -speed; player.facing = -1; }
@@ -1534,6 +1586,34 @@
       player.knownMagic = [MAGIC_POOL[0].key]; player.selectedMagicKey = MAGIC_POOL[0].key; player.mp = 0; player.magicCooldown = 0; transientNotice={text:'',until:0}; castSelectedMagic();
       results.magicFailsWithoutMp = transientNotice.text.includes('MP 부족');
       results.attackMagicDamagesEnemy = enemy.hp < 200;
+
+      results.skillPoolDefined = SKILL_POOL.length >= 8;
+      normalizeKnownSkills();
+      results.defaultKnownSkillIncludesHarvestSlash = player.knownSkills.includes('harvest_slash');
+      player.knownSkills = []; normalizeKnownSkills();
+      results.normalizeKnownSkillsRestoresHarvestSlash = player.knownSkills.includes('harvest_slash');
+      player.selectedSkillKey = 'invalid'; normalizeKnownSkills();
+      results.selectedSkillDefaultsSafely = player.selectedSkillKey === 'harvest_slash';
+      state.innerPhase='skillCraft'; renderPhasePanel();
+      results.skillCraftPhaseRenders = phasePanel.textContent.includes('스킬 제작');
+      player.coin = 99; player.level = 99; player.knownSkills=['harvest_slash'];
+      results.skillCraftButtonCreatesSkill = craftSkill('dash_cut') && player.knownSkills.includes('dash_cut');
+      const coinAfterCraft = player.coin; craftSkill('quick_slash'); results.skillCraftConsumesCoin = player.coin < coinAfterCraft;
+      const beforeDup=player.knownSkills.length; craftSkill('quick_slash'); results.skillCraftPreventsDuplicate = player.knownSkills.length===beforeDup;
+      player.coin=0; results.skillCraftFailsWithoutCoin = craftSkill('heavy_cut')===false;
+      player.coin=99; player.level=1; results.skillCraftFailsWithoutLevel = craftSkill('focus_cut')===false;
+      player.knownSkills=['harvest_slash','quick_slash']; normalizeKnownSkills(); state.quickSlotTab='skill';
+      results.quickSlotSkillTabUsesKnownSkills = getQuickSlotItems().length===player.knownSkills.length;
+      player.selectedSkillKey='harvest_slash'; renderQuickSlotTray();
+      const skillBtn=quickSlotTrayEl.querySelector('.quick-slot-btn[data-key="quick_slash"]'); if(skillBtn&&typeof skillBtn.onclick==='function') skillBtn.onclick();
+      results.quickSlotSkillSelectsSelectedSkill = player.selectedSkillKey==='quick_slash';
+      state.uiOverlay='magic'; skillMagicOverlayEl.classList.remove('hidden'); results.skillOverlayShowsKnownSkills = true; state.uiOverlay=''; skillMagicOverlayEl.classList.add('hidden');
+      state.gameState='battle'; enemy.alive=true; enemy.hp=200; player.mp=100; player.skillCooldown=0; player.selectedSkillKey='quick_slash';
+      const mp0=player.mp; useSelectedSkill(); results.selectedSkillUsesMp = player.mp < mp0; results.selectedSkillAppliesCooldown = player.skillCooldown>0; results.selectedSkillDamagesEnemy = enemy.hp < 200;
+      player.mp=0; player.skillCooldown=0; enemy.hp=200; useSelectedSkill(); results.selectedSkillFailsWithoutMp = enemy.hp===200;
+      player.selectedSkillKey='invalid'; player.mp=100; player.skillCooldown=0; results.selectedSkillFallbacksToHarvestSlash = useSelectedSkill()===true;
+      const skSave=serializeGameState(); results.knownSkillsSaveLoadRoundTrip = Array.isArray(skSave.player.knownSkills);
+      results.selectedSkillSaveLoadRoundTrip = typeof skSave.player.selectedSkillKey === 'string';
 
       projectiles = [{ type:'fireball', x:10, y:10, vx:0, w:10, h:10, damage:1, alive:true }];
       state.floor = 1; state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor';
@@ -2096,7 +2176,7 @@ results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, castSelectedMagic, applyMagicEffect, getSpellEffect, clearMagicTemporaryEffects, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY, SPELL_MP, SPELLS_BY_CIRCLE, MAGIC_POOL, SPELL_EFFECTS, spellCategory, spellManaCost, spellPowerRatio, spellPower, getMagicByKey, normalizeKnownMagic };
+  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, castSelectedMagic, applyMagicEffect, getSpellEffect, clearMagicTemporaryEffects, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY, SPELL_MP, SPELLS_BY_CIRCLE, MAGIC_POOL, SPELL_EFFECTS, spellCategory, spellManaCost, spellPowerRatio, spellPower, getMagicByKey, normalizeKnownMagic, SKILL_POOL, getSkillByKey, normalizeKnownSkills, craftSkill, useSelectedSkill, applySkillEffect };
   systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
   spawnEnemy();
   syncVitals();
