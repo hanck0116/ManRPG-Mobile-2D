@@ -398,3 +398,12 @@ window.ManRPG.runDebugTests()
   - systemMenuClosesOnToggle
   - systemMenuDoesNotOverlapQuickSlot
   - skillMagicOverlayHidesQuickSlot
+
+## 전체 마법 전투 구현 v0.1
+- selectedMagicKey 기반 castSelectedMagic() 추가
+- 1~9서클 모든 마법을 MAGIC_POOL + SPELL_EFFECTS로 전투 적용
+- 효과 타입: damage/highDamage/dot/heal/shield/barrier/slow/bind/sleep/blind/silence/cancel/teleport/buff/drain/summonStrike/execute/weather/field
+- 광역/소환/필드 마법은 현재 적 1명 기준으로 단순 적용
+- 전투 상태효과: enemy slow/bind/sleep/blind/silence/dot, player shield/barrier/buff/evasion
+- 퀵슬롯/오버레이 선택 마법과 전투 마법 버튼 연동 유지
+- runDebugTests 확장 키: castSelectedMagicExists, allMagicPoolEntriesHaveEffect, everySpellCanResolveEffect, selectedMagicCastsAndConsumesMp, magicFailsWithoutKnownMagic, magicFailsWithoutMp 등

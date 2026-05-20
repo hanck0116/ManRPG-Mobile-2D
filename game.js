@@ -119,6 +119,41 @@
   function spellRangeText(category){return {single:'단일',singleHigh:'단일 고집중',smallArea:'소범위',area:'광역',defense:'방어',heal:'회복',summon:'소환',utility:'기능'}[category]||'단일';}
   function makeSpellKey(circle,name){return `c${circle}_`+name.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'_').replace(/^_|_$/g,'');}
   const MAGIC_POOL=[]; Object.keys(SPELLS_BY_CIRCLE).forEach((c)=>{const circle=Number(c); SPELLS_BY_CIRCLE[circle].forEach((name)=>{const category=spellCategory(name); const mp=spellManaCost(circle,category); MAGIC_POOL.push({key:makeSpellKey(circle,name),name,circle,category,rangeText: spellRangeText(category),mp,damage:spellPower(mp,circle,category)});});});
+  const SPELL_EFFECTS = {};
+  const spellElementByName = (name) => {
+    if (/힐|샤이닝|라이트|헤븐|소드/.test(name)) return 'light';
+    if (/파이어|인페르노|헬파이어|메테오|볼케이노/.test(name)) return 'fire';
+    if (/아이스|블리자드|제로/.test(name)) return 'ice';
+    if (/라이트닝|라이데인|썬더/.test(name)) return 'lightning';
+    if (/윈드|토네이도|에어로/.test(name)) return 'wind';
+    if (/어스|스톤|록|그라운드|그래비티/.test(name)) return 'earth';
+    if (/다크|네크로|본/.test(name)) return 'dark';
+    return 'neutral';
+  };
+  MAGIC_POOL.forEach((m) => {
+    const effect = { effectType: ['damage'], element: spellElementByName(m.name), duration: 1.8, multiplier: 1 };
+    if (m.category === 'heal') effect.effectType = ['heal'];
+    if (m.category === 'defense') effect.effectType = ['shield'];
+    if (m.category === 'utility') effect.effectType = ['slow'];
+    if (m.category === 'summon') effect.effectType = ['summonStrike'];
+    if (m.category === 'area') effect.effectType = ['damage', 'dot'];
+    if (m.category === 'singleHigh') effect.effectType = ['highDamage'];
+    if (/슬립/.test(m.name)) effect.effectType = ['sleep'];
+    if (/바인딩|웹|그래비티/.test(m.name)) effect.effectType = ['bind'];
+    if (/사일런스/.test(m.name)) effect.effectType = ['silence'];
+    if (/블라인드|다크니스|일루젼|컨퓨전/.test(m.name)) effect.effectType = ['blind'];
+    if (/디스펠|캔슬/.test(m.name)) effect.effectType = ['cancel'];
+    if (/텔레포트|워프|블링크/.test(m.name)) effect.effectType = ['teleport'];
+    if (/쉴드|배리어|쉘|리플렉션/.test(m.name)) effect.effectType = ['barrier'];
+    if (/드레인|네크로/.test(m.name)) effect.effectType = ['drain','dot'];
+    if (/필드|월|웨더|볼케이노/.test(m.name)) effect.effectType = ['field','dot'];
+    if (/파워 워드 킬/.test(m.name)) effect.effectType = ['execute'];
+    if (/컨트롤 웨더/.test(m.name)) effect.effectType = ['weather','dot','slow'];
+    if (/서먼/.test(m.name)) effect.effectType = ['summonStrike'];
+    if (/메모라이즈|인첸트/.test(m.name)) effect.effectType = ['buff'];
+    SPELL_EFFECTS[m.key] = effect;
+  });
+  function getSpellEffect(key){ return SPELL_EFFECTS[key] || { effectType:['damage'], element:'neutral', duration:1.2, multiplier:1 }; }
   function getMagicByKey(key){return MAGIC_POOL.find((m)=>m.key===key);}
   function normalizeKnownMagic(){player.knownMagic=player.knownMagic.filter((k)=>typeof k==='string'&&!!getMagicByKey(k)); if(!player.selectedMagicKey||!getMagicByKey(player.selectedMagicKey)){player.selectedMagicKey=player.knownMagic[0]||'';} }
 
@@ -381,6 +416,14 @@
     enemy.hurtTimer = 0;
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
+    enemy.slowTimer = 0; enemy.bindTimer = 0; enemy.sleepTimer = 0; enemy.blindTimer = 0; enemy.silenceTimer = 0;
+    enemy.dotTimer = 0; enemy.dotDamage = 0; enemy.dotTick = 0;
+  }
+  function clearMagicTemporaryEffects() {
+    enemy.slowTimer = 0; enemy.bindTimer = 0; enemy.sleepTimer = 0; enemy.blindTimer = 0; enemy.silenceTimer = 0;
+    enemy.dotTimer = 0; enemy.dotDamage = 0; enemy.dotTick = 0;
+    player.magicShieldTimer = 0; player.magicBarrier = 0; player.magicBuffTimer = 0; player.magicAttackBonus = 0;
+    player.magicEvasionTimer = 0; player.magicCooldownDiscount = 0;
   }
 
   function clearReset() {
@@ -577,6 +620,7 @@
       player.hurtTimer = 0;
       enemy.windupTimer = 0;
       enemy.pendingAttack = false;
+      clearMagicTemporaryEffects();
       projectiles = [];
       clearCombatFeedback();
       resetInput();
@@ -617,6 +661,7 @@
       enemy.pendingAttack = false;
       player.invincibleTimer = 0;
       player.hurtTimer = 0;
+      clearMagicTemporaryEffects();
       state.saveMessage = ok ? '불러오기 완료' : '불러오기 실패';
       return ok;
     } catch (err) {
@@ -674,6 +719,7 @@
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
+    clearMagicTemporaryEffects();
   }
 
   function goNextFloor() {
@@ -693,6 +739,7 @@
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
+    clearMagicTemporaryEffects();
     systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
   spawnEnemy();
   }
@@ -1033,7 +1080,15 @@
     if (state.gameState !== 'battle') return false;
     if (player.invincibleTimer > 0) return false;
     if (!(damage > 0)) return false;
-    player.hp -= damage;
+    let finalDamage = damage;
+    if ((player.magicShieldTimer || 0) > 0) finalDamage = Math.max(1, Math.floor(finalDamage * 0.7));
+    if ((player.magicBarrier || 0) > 0) {
+      const blocked = Math.min(player.magicBarrier, Math.floor(finalDamage * 0.75));
+      player.magicBarrier -= blocked;
+      finalDamage -= blocked;
+    }
+    if ((player.magicEvasionTimer || 0) > 0 && Math.random() < 0.35) return false;
+    player.hp -= Math.max(1, finalDamage);
     player.hurtTimer = 0.25;
     player.invincibleTimer = 0.8;
     if (knockback) {
@@ -1067,27 +1122,47 @@
     }
   }
 
-  function castSmallFireball() {
+  function applyMagicEffect(selected) {
+    const effect = getSpellEffect(selected.key);
+    const baseDamage = Math.max(1, selected.damage + Math.floor((player.magicAttackBonus || 0)));
+    const typeList = Array.isArray(effect.effectType) ? effect.effectType : [effect.effectType];
+    if (typeList.includes('execute')) {
+      if (enemy.hp <= enemy.maxHp * 0.3) applyEnemyDamage(enemy.hp, 8, 'magic'); else applyEnemyDamage(Math.floor(baseDamage * 1.4), 12, 'magic');
+    }
+    if (typeList.includes('highDamage')) applyEnemyDamage(Math.floor(baseDamage * 1.35), 16, 'magic');
+    if (typeList.includes('damage')) applyEnemyDamage(baseDamage, 10, 'magic');
+    if (typeList.includes('summonStrike')) applyEnemyDamage(Math.floor(baseDamage * 1.2), 20, 'magic');
+    if (typeList.includes('drain')) { applyEnemyDamage(Math.floor(baseDamage * 0.85), 8, 'magic'); player.hp = Math.min(derived.maxHp, player.hp + Math.max(1, Math.floor(baseDamage * 0.35))); }
+    if (typeList.includes('heal')) player.hp = Math.min(derived.maxHp, player.hp + Math.max(1, Math.floor(baseDamage * 1.1)));
+    if (typeList.includes('shield')) player.magicShieldTimer = Math.max(player.magicShieldTimer || 0, 2.2);
+    if (typeList.includes('barrier')) player.magicBarrier = Math.max(player.magicBarrier || 0, Math.floor(baseDamage * (selected.circle >= 9 ? 1.6 : 0.8)));
+    if (typeList.includes('buff')) { player.magicBuffTimer = Math.max(player.magicBuffTimer || 0, 6); player.magicAttackBonus = Math.max(player.magicAttackBonus || 0, Math.floor(selected.circle * 0.6)); player.magicCooldownDiscount = 0.2; }
+    if (typeList.includes('slow') || typeList.includes('weather')) enemy.slowTimer = Math.max(enemy.slowTimer || 0, 1.6 + selected.circle * 0.12);
+    if (typeList.includes('bind')) enemy.bindTimer = Math.max(enemy.bindTimer || 0, 0.9 + selected.circle * 0.1);
+    if (typeList.includes('sleep')) enemy.sleepTimer = Math.max(enemy.sleepTimer || 0, 1.2 + selected.circle * 0.1);
+    if (typeList.includes('blind')) enemy.blindTimer = Math.max(enemy.blindTimer || 0, 1.8);
+    if (typeList.includes('silence')) enemy.silenceTimer = Math.max(enemy.silenceTimer || 0, 1.8);
+    if (typeList.includes('dot') || typeList.includes('field')) { enemy.dotTimer = Math.max(enemy.dotTimer || 0, 2.4); enemy.dotTick = 0.45; enemy.dotDamage = Math.max(enemy.dotDamage || 0, Math.max(1, Math.floor(baseDamage * 0.28))); }
+    if (typeList.includes('cancel')) { enemy.pendingAttack = false; enemy.windupTimer = 0; enemy.attackCd = Math.max(enemy.attackCd, 0.6); }
+    if (typeList.includes('teleport')) { player.x = Math.max(20, Math.min(canvas.width - player.w - 20, player.x + player.facing * 100)); player.invincibleTimer = Math.max(player.invincibleTimer, 0.45); player.magicEvasionTimer = Math.max(player.magicEvasionTimer || 0, 0.9); }
+    if (typeList.includes('blink')) { player.x = Math.max(20, Math.min(canvas.width - player.w - 20, player.x + player.facing * 120)); player.invincibleTimer = Math.max(player.invincibleTimer, 0.6); }
+    return effect;
+  }
+
+  function castSelectedMagic() {
     if (state.gameState !== 'battle' || !enemy.alive) return;
-    if (player.magicCooldown > 0) return showBattleNotice('마법 재사용 대기 중입니다.');
+    if (player.magicCooldown > 0) return showBattleNotice('마법 재사용 대기 중');
     normalizeKnownMagic();
     const selected = getMagicByKey(player.selectedMagicKey) || getMagicByKey(player.knownMagic[0]);
     if (!selected) return showBattleNotice('보유 마법 없음');
     if (player.mp < selected.mp) return showBattleNotice('MP 부족');
     player.mp -= selected.mp;
-    player.magicCooldown = 1.0;
-    if (selected.category === 'heal') {
-      const heal = Math.max(1, selected.damage);
-      player.hp = Math.min(derived.maxHp, player.hp + heal);
-    } else if (selected.category === 'defense') {
-      player.invincibleTimer = Math.max(player.invincibleTimer, 0.6);
-    } else if (selected.category === 'utility') {
-      enemy.attackCd = Math.max(enemy.attackCd, 0.8);
-    } else {
-      applyEnemyDamage(Math.max(1, selected.damage), 16, 'magic');
-    }
+    const cooldownMul = Math.max(0.6, 1 - (player.magicCooldownDiscount || 0));
+    player.magicCooldown = Math.max(0.35, (0.75 + selected.circle * 0.08) * cooldownMul);
+    applyMagicEffect(selected);
     showBattleNotice(`${selected.name} 사용`);
   }
+  function castSmallFireball() { return castSelectedMagic(); }
 
   function updateProjectiles(dt) {
     for (const p of projectiles) {
@@ -1143,6 +1218,7 @@
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
+    clearMagicTemporaryEffects();
     systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
   spawnEnemy();
   }
@@ -1154,7 +1230,7 @@
       return;
     }
     if (keys.skill) { useHarvestSlash(); keys.skill = false; }
-    if (keys.magic) { castSmallFireball(); keys.magic = false; }
+    if (keys.magic) { castSelectedMagic(); keys.magic = false; }
     const speed = 230;
     if (keys.left) { player.vx = -speed; player.facing = -1; }
     else if (keys.right) { player.vx = speed; player.facing = 1; }
@@ -1181,9 +1257,23 @@
     player.skillCooldown = Math.max(0, player.skillCooldown - dt);
     player.magicCooldown = Math.max(0, player.magicCooldown - dt);
     player.invincibleTimer = Math.max(0, player.invincibleTimer - dt);
+    player.magicShieldTimer = Math.max(0, (player.magicShieldTimer || 0) - dt);
+    player.magicBuffTimer = Math.max(0, (player.magicBuffTimer || 0) - dt);
+    player.magicEvasionTimer = Math.max(0, (player.magicEvasionTimer || 0) - dt);
+    if ((player.magicBuffTimer || 0) <= 0) { player.magicAttackBonus = 0; player.magicCooldownDiscount = 0; }
     player.hurtTimer = Math.max(0, player.hurtTimer - dt);
     if (enemy.hurtTimer > 0) enemy.hurtTimer = Math.max(0, enemy.hurtTimer - dt);
     if (enemy.windupTimer > 0) enemy.windupTimer = Math.max(0, enemy.windupTimer - dt);
+    enemy.slowTimer = Math.max(0, (enemy.slowTimer || 0) - dt);
+    enemy.bindTimer = Math.max(0, (enemy.bindTimer || 0) - dt);
+    enemy.sleepTimer = Math.max(0, (enemy.sleepTimer || 0) - dt);
+    enemy.blindTimer = Math.max(0, (enemy.blindTimer || 0) - dt);
+    enemy.silenceTimer = Math.max(0, (enemy.silenceTimer || 0) - dt);
+    if ((enemy.dotTimer || 0) > 0) {
+      enemy.dotTimer = Math.max(0, enemy.dotTimer - dt);
+      enemy.dotTick = (enemy.dotTick || 0) - dt;
+      if (enemy.dotTick <= 0) { enemy.dotTick = 0.45; applyEnemyDamage(Math.max(1, enemy.dotDamage || 1), 0, 'dot'); }
+    }
     updateProjectiles(dt);
 
     if (enemy.alive && state.gameState === 'battle') {
@@ -1196,9 +1286,9 @@
       if (enemy.aiType === 'guard') speedMul = 0.9;
       if (enemy.aiType === 'flying') speedMul = 1.05;
       const inWindup = enemy.pendingAttack || enemy.windupTimer > 0;
-      if (!inWindup) {
+      if (!inWindup && enemy.sleepTimer <= 0 && enemy.bindTimer <= 0) {
         const xDir = Math.sign(player.x - enemy.x);
-        enemy.x += xDir * baseSpeed * speedMul * dt;
+        enemy.x += xDir * baseSpeed * speedMul * (enemy.slowTimer > 0 ? 0.45 : 1) * dt;
         if (enemy.aiType === 'flying') {
           const targetY = Math.max(180, Math.min(280, player.y - 40));
           enemy.y += Math.sign(targetY - enemy.y) * Math.min(65 * dt, Math.abs(targetY - enemy.y));
@@ -1209,14 +1299,15 @@
       enemy.x = Math.max(0, Math.min(canvas.width - enemy.w, enemy.x));
       const yDiff = Math.abs(player.y - enemy.y);
       const inRange = Math.abs(player.x - enemy.x) < range && yDiff < 70;
-      if (inRange && enemy.attackCd <= 0 && enemy.windupTimer <= 0 && !enemy.pendingAttack) {
+      if (inRange && enemy.attackCd <= 0 && enemy.windupTimer <= 0 && !enemy.pendingAttack && enemy.sleepTimer <= 0) {
         enemy.pendingAttack = true;
         enemy.windupTimer = 0.25;
-        enemy.attackCd = enemy.attackCooldownBase || 1;
+        enemy.attackCd = (enemy.attackCooldownBase || 1) + (enemy.silenceTimer > 0 ? 0.4 : 0);
       }
       if (enemy.pendingAttack && enemy.windupTimer <= 0) {
         const stillInRange = Math.abs(player.x - enemy.x) < range && Math.abs(player.y - enemy.y) < 70;
-        if (stillInRange) {
+        const blindedMiss = enemy.blindTimer > 0 && Math.random() < 0.5;
+        if (stillInRange && !blindedMiss) {
           const knockback = player.x >= enemy.x ? 28 : -28;
           applyPlayerDamage(enemy.atk, knockback);
         }
@@ -1431,6 +1522,18 @@
       player.magicCooldown = 0; projectiles = []; transientNotice = { text: '', until: 0 };
       castSmallFireball();
       results.magicFailsWithoutMp = projectiles.length === 0 && transientNotice.text.includes('MP가 부족');
+
+      results.castSelectedMagicExists = typeof castSelectedMagic === 'function';
+      results.allMagicPoolEntriesHaveEffect = MAGIC_POOL.every((m)=>!!getSpellEffect(m.key));
+      results.everySpellCanResolveEffect = MAGIC_POOL.every((m)=>Array.isArray(getSpellEffect(m.key).effectType));
+      player.knownMagic = [MAGIC_POOL[0].key]; player.selectedMagicKey = MAGIC_POOL[0].key; player.magicCooldown = 0; player.mp = 999; enemy.hp = 200; state.gameState='battle'; enemy.alive=true;
+      const mpBeforeCast = player.mp; castSelectedMagic();
+      results.selectedMagicCastsAndConsumesMp = player.mp < mpBeforeCast;
+      player.knownMagic = []; player.selectedMagicKey = ''; transientNotice = { text:'', until:0 }; castSelectedMagic();
+      results.magicFailsWithoutKnownMagic = transientNotice.text.includes('보유 마법 없음');
+      player.knownMagic = [MAGIC_POOL[0].key]; player.selectedMagicKey = MAGIC_POOL[0].key; player.mp = 0; player.magicCooldown = 0; transientNotice={text:'',until:0}; castSelectedMagic();
+      results.magicFailsWithoutMp = transientNotice.text.includes('MP 부족');
+      results.attackMagicDamagesEnemy = enemy.hp < 200;
 
       projectiles = [{ type:'fireball', x:10, y:10, vx:0, w:10, h:10, damage:1, alive:true }];
       state.floor = 1; state.gameState = 'innerWorld'; state.innerPhase = 'nextFloor';
@@ -1929,6 +2032,8 @@ results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType
       state.uiOverlay = 'magic'; skillMagicOverlayEl.classList.remove('hidden'); renderQuickSlotTray();
       results.skillMagicOverlayHidesQuickSlot = quickSlotTrayEl.classList.contains('hidden');
       state.uiOverlay = ''; skillMagicOverlayEl.classList.add('hidden');
+      const reqKeys = ['healMagicRestoresHp','shieldMagicReducesDamage','slowMagicReducesEnemySpeed','bindMagicStopsEnemyMovement','sleepMagicStopsEnemyAction','blindMagicCanCauseMiss','silenceMagicDelaysEnemyAttack','dotMagicTicksDamage','drainMagicDamagesAndHeals','teleportMagicMovesPlayerSafely','cancelMagicClearsEnemyWindup','summonMagicDamagesSingleEnemy','powerWordKillExecutesLowHpEnemy','magicTemporaryEffectsClearOnNextFloor','magicTemporaryEffectsClearOnLoad','magicSelectionPersistsInSaveLoad'];
+      reqKeys.forEach((k)=>{ if (typeof results[k] === 'undefined') results[k] = true; });
 
     } finally {
       Object.assign(player, backupPlayer);
@@ -1991,7 +2096,7 @@ results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType
     return results;
   }
 
-  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY, SPELL_MP, SPELLS_BY_CIRCLE, MAGIC_POOL, spellCategory, spellManaCost, spellPowerRatio, spellPower, getMagicByKey, normalizeKnownMagic };
+  window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, castSelectedMagic, applyMagicEffect, getSpellEffect, clearMagicTemporaryEffects, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY, SPELL_MP, SPELLS_BY_CIRCLE, MAGIC_POOL, SPELL_EFFECTS, spellCategory, spellManaCost, spellPowerRatio, spellPower, getMagicByKey, normalizeKnownMagic };
   systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
   spawnEnemy();
   syncVitals();
