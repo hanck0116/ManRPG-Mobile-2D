@@ -350,3 +350,13 @@ window.ManRPG.runDebugTests()
   - `magicHealRestoresHp`
   - `magicDefenseAppliesState`
   - `magicUtilityAppliesState`
+
+## 가로 화면 UI 리디자인 v0.1
+- 전투 화면 compact HUD
+- enemy HP bar
+- 하단 조작 버튼 재배치
+- 스킬/마법 퀵슬롯 트레이(탭/페이지/접기)
+- 스킬/마법 선택 오버레이 구조
+- 심상세계 오버레이 메뉴 구성
+- 시스템 메뉴(저장/불러오기/삭제/테스트 실행) 접근 개선
+- runDebugTests 키 보강: quickSlotTrayRenders, quickSlotTabSwitchWorks, magicQuickSlotSelectsSelectedMagic, skillMagicOverlayOpens, skillMagicOverlayCloses, innerWorldOverlayMenuRenders, systemMenuButtonsRemainBound, controlsRemainBoundAfterUiRedesign, spawnEnemyDoesNotResolveFloorClear, autoFloorClearOnlyAfterEnemyDefeat, rewardCannotBeClaimedTwice

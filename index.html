@@ -7,12 +7,16 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="app">
-    <section class="hud" id="hud"></section>
-
+  <main class="app game-root">
     <section class="battle-wrap">
       <canvas id="gameCanvas" width="960" height="360" aria-label="battle canvas"></canvas>
-      <div class="phase-panel" id="phasePanel"></div>
+      <section class="hud compact" id="hud"></section>
+      <section class="phase-panel" id="phasePanel"></section>
+      <section class="enemy-bar" id="enemyBar"></section>
+      <button id="systemMenuToggle" class="system-menu-toggle" aria-label="system menu">☰</button>
+      <section id="systemMenu" class="system-menu hidden"></section>
+      <section id="quickSlotTray" class="quick-slot-tray"></section>
+      <section id="skillMagicOverlay" class="skill-magic-overlay hidden"></section>
     </section>
   </main>
 

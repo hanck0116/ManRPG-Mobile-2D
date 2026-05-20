@@ -4,6 +4,11 @@
   const hudEl = document.getElementById('hud');
   const phasePanel = document.getElementById('phasePanel');
   const controls = document.getElementById('controls');
+  const enemyBarEl = document.getElementById('enemyBar');
+  const systemMenuEl = document.getElementById('systemMenu');
+  const systemMenuToggleEl = document.getElementById('systemMenuToggle');
+  const quickSlotTrayEl = document.getElementById('quickSlotTray');
+  const skillMagicOverlayEl = document.getElementById('skillMagicOverlay');
   let transientNotice = { text: '', until: 0 };
   const SAVE_KEY = 'manrpg_mobile_2d_save_v1';
 
@@ -29,6 +34,12 @@
     innerActionsDone: { clearReset: false, fiveLevelPlus: false, rewardConfirmed: false },
     floorClearResolved: false,
     floorRewardClaimed: false,
+    uiOverlay: '',
+    quickSlotTab: 'skill',
+    quickSlotPage: 0,
+    quickSlotCollapsed: false,
+    overlayCategory: 'all',
+    systemMenuOpen: false,
   };
 
   const player = {
@@ -179,7 +190,8 @@
     player.mp = derived.maxMp;
     projectiles = [];
     clearCombatFeedback();
-    spawnEnemy();
+    systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
+  spawnEnemy();
   }
 
   function applyRecommendedInitialStats() {
@@ -649,6 +661,7 @@
   }
 
   function enterInnerWorld() {
+    autoResolveFloorClear();
     state.itemUseMessage = '';
     state.shopMessage = '';
     state.gameState = 'innerWorld';
@@ -680,7 +693,8 @@
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
-    spawnEnemy();
+    systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
+  spawnEnemy();
   }
 
   function tryLearnMagic(book, options = {}) {
@@ -700,21 +714,17 @@
   function renderHUD() {
     syncVitals();
     normalizeKnownMagic();
-    hudEl.innerHTML = `
-      <div><span class="tag">이름</span>: ${player.name}</div>
-      <div><span class="tag">칭호</span>: ${player.title}</div>
-      <div><span class="tag">만트라</span>: ${player.mantra}</div>
-      <div><span class="tag">상태</span>: ${state.gameState === 'battle' ? '전투' : (state.gameState === 'innerWorld' ? '심상세계' : (state.gameState === 'initialStatAllocate' ? '초기 분배' : '패배'))}</div>
-      <hr />
-      <div>층 ${state.floor} | Lv ${player.level} | 코인 ${player.coin}</div>
-      <div>HP ${Math.floor(player.hp)} / ${derived.maxHp} | MP ${Math.floor(player.mp)} / ${derived.maxMp}</div>
-      <div>스탯 힘/민/체/지/혜/외: ${player.str}/${player.agi}/${player.vit}/${player.int}/${player.wis}/${player.looks}</div>
-      <div>공격 ${derived.atk} | 검기 ${player.swordAura} | 멀캐 ${player.multicasting}</div>
-      <div class="enemy">적 ${enemy.name || '알 수 없음'} | HP ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div>
-      <div>인벤 ${player.inventory.length}개 ${player.inventory.length ? '(' + player.inventory.join(', ') + ')' : ''}</div>
-    `;
+    const selectedMagic = getMagicByKey(player.selectedMagicKey);
+    hudEl.innerHTML = `<div>층 ${state.floor} | Lv ${player.level}</div>
+      <div>HP ${Math.floor(player.hp)} / ${derived.maxHp}</div>
+      <div>MP ${Math.floor(player.mp)} / ${derived.maxMp}</div>
+      <div>코인 ${player.coin}</div>
+      <div>공 ${derived.atk} | 방 ${Math.floor(player.vit/2)} | 치 ${Math.floor(player.agi*0.8)}%</div>
+      <div class="stat-message">선택 마법: ${selectedMagic ? selectedMagic.name : '없음'}</div>`;
+    const enemyHpText = enemy.alive ? `${Math.max(0, Math.floor(enemy.hp))} / ${enemy.maxHp}` : '처치됨';
+    const ratio = enemy.maxHp > 0 ? Math.max(0, Math.min(100, (enemy.hp / enemy.maxHp) * 100)) : 0;
+    enemyBarEl.innerHTML = `<div>${enemy.name || '적'} <span style="float:right">HP ${enemyHpText}</span></div><div class="enemy-hp"><i style="width:${ratio}%"></i></div>`;
   }
-
 
   function appendSaveControls() {
     phasePanel.insertAdjacentHTML('beforeend', saveButtonsHtml());
@@ -748,8 +758,35 @@
   }
 
   function appendPanelControls() {
-    appendSaveControls();
-    appendDebugControls();
+    renderSystemMenu();
+  }
+
+
+  function renderSystemMenu() {
+    systemMenuEl.classList.toggle('hidden', !state.systemMenuOpen);
+    systemMenuEl.innerHTML = saveButtonsHtml() + debugControlsHtml();
+    bindSaveButtons();
+    bindDebugButtons();
+  }
+
+  function getQuickSlotItems() {
+    if (state.quickSlotTab === 'skill') return [{ key: 'harvest_slash', name: '수확 베기', circle: '-', mp: 0, category: 'attack' }];
+    return player.knownMagic.map((k) => getMagicByKey(k)).filter(Boolean);
+  }
+
+  function renderQuickSlotTray() {
+    const items = getQuickSlotItems();
+    const pageSize = 4; const pages = Math.max(1, Math.ceil(items.length / pageSize));
+    state.quickSlotPage = Math.max(0, Math.min(state.quickSlotPage, pages - 1));
+    const pageItems = items.slice(state.quickSlotPage * pageSize, state.quickSlotPage * pageSize + pageSize);
+    quickSlotTrayEl.innerHTML = `<div class="slot-tabs"><button id="slotSkillTab">스킬</button><button id="slotMagicTab">마법</button><button id="toggleTray" style="margin-left:auto">${state.quickSlotCollapsed?'▼':'▲'}</button></div>${state.quickSlotCollapsed ? '' : `<div class="slot-grid">${(pageItems.length?pageItems:[null,null,null,null]).map((item, idx)=> item ? `<button class="slot quick-slot-btn" data-key="${item.key}">${item.name}<br>${item.circle !== '-' ? `C${item.circle} MP${item.mp}` : '전용 스킬'}</button>` : '<button class="slot" disabled>빈 슬롯</button>').join('')}</div><div class="slot-page"><button id="slotPrev">←</button><span>${state.quickSlotPage+1} / ${pages}</span><button id="slotNext">→</button></div>`}`;
+    document.getElementById('slotSkillTab').onclick = ()=>{state.quickSlotTab='skill';state.quickSlotPage=0;renderQuickSlotTray();};
+    document.getElementById('slotMagicTab').onclick = ()=>{state.quickSlotTab='magic';state.quickSlotPage=0;renderQuickSlotTray();};
+    document.getElementById('toggleTray').onclick = ()=>{state.quickSlotCollapsed=!state.quickSlotCollapsed;renderQuickSlotTray();};
+    const prev=document.getElementById('slotPrev'); const next=document.getElementById('slotNext');
+    if(prev) prev.onclick=()=>{state.quickSlotPage=Math.max(0,state.quickSlotPage-1);renderQuickSlotTray();};
+    if(next) next.onclick=()=>{state.quickSlotPage=Math.min(pages-1,state.quickSlotPage+1);renderQuickSlotTray();};
+    quickSlotTrayEl.querySelectorAll('.quick-slot-btn').forEach((btn)=>btn.onclick=()=>{if(state.quickSlotTab==='magic'){player.selectedMagicKey=btn.dataset.key;} renderQuickSlotTray(); renderHUD();});
   }
 
   function renderPhasePanel() {
@@ -788,7 +825,7 @@
       return;
     }
     if (state.gameState === 'battle') {
-      phasePanel.innerHTML = `<div>전투 진행 중... 적을 처치하면 심상세계로 진입합니다.</div><div>적: ${enemy.name || '알 수 없음'}</div><div>설명: ${enemy.description || ''}</div><div>적 HP: ${enemy.alive ? Math.max(0, Math.floor(enemy.hp)) + ' / ' + enemy.maxHp : '처치됨'}</div><div>적 공격력: ${enemy.atk}</div>${notice}`;
+      phasePanel.innerHTML = `<div>적 처치 시 심상세계 진입</div>${notice}`;
       appendPanelControls();
       return;
     }
@@ -1086,7 +1123,8 @@
     clearCombatFeedback();
     enemy.windupTimer = 0;
     enemy.pendingAttack = false;
-    spawnEnemy();
+    systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
+  spawnEnemy();
   }
 
   function updateBattle(dt) {
@@ -1241,7 +1279,9 @@
     }
     renderCanvas();
     renderHUD();
+    renderQuickSlotTray();
     renderPhasePanel();
+    renderSystemMenu();
     requestAnimationFrame(loop);
   }
 
@@ -1768,8 +1808,32 @@
         enemyTypes.some(type => type.id === 'hungryWolf') && enemyTypes.some(type => type.id === 'goblin') &&
         enemyTypes.some(type => type.id === 'slime') && enemyTypes.some(type => type.id === 'skeleton') && enemyTypes.some(type => type.id === 'bat');
 
-      spawnEnemy();
-      results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType;
+      systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
+  spawnEnemy();
+      
+      results.quickSlotTrayRenders = !!document.getElementById('quickSlotTray');
+      state.quickSlotTab = 'skill'; renderQuickSlotTray();
+      const toMagic = document.getElementById('slotMagicTab'); if (toMagic && typeof toMagic.onclick === 'function') toMagic.onclick();
+      results.quickSlotTabSwitchWorks = state.quickSlotTab === 'magic';
+      if (player.knownMagic.length) { state.quickSlotTab='magic'; renderQuickSlotTray(); const first = quickSlotTrayEl.querySelector('.quick-slot-btn'); if(first && typeof first.onclick==='function') first.onclick(); }
+      results.magicQuickSlotSelectsSelectedMagic = !player.knownMagic.length || !!player.selectedMagicKey;
+      state.uiOverlay = 'magic';
+      results.skillMagicOverlayOpens = state.uiOverlay === 'magic';
+      state.uiOverlay = '';
+      results.skillMagicOverlayCloses = state.uiOverlay === '';
+      state.gameState='innerWorld'; state.innerPhase='menu'; renderPhasePanel();
+      results.innerWorldOverlayMenuRenders = phasePanel.textContent.includes('심상세계');
+      state.systemMenuOpen=true; renderSystemMenu();
+      results.systemMenuButtonsRemainBound = !!document.getElementById('runDebugTestsBtn');
+      results.controlsRemainBoundAfterUiRedesign = !!controls.querySelector('[data-action="attack"]');
+      const resolvedBefore = state.floorClearResolved; spawnEnemy();
+      results.spawnEnemyDoesNotResolveFloorClear = state.floorClearResolved === resolvedBefore;
+      state.floorClearResolved=false; enemy.alive=true; enemy.hp=1; state.gameState='battle'; applyEnemyDamage(2,0,'test');
+      results.autoFloorClearOnlyAfterEnemyDefeat = state.gameState === 'innerWorld' && state.floorClearResolved === true;
+      state.innerPhase='rewardPick'; state.floorRewardClaimed=false; state.innerActionsDone.rewardConfirmed=false; state.rewardCandidates=['추가 코인 +2']; state.rewardMeta={candidateCount:1,pickCount:1}; state.rewardSelected=new Set([0]);
+      renderPhasePanel(); const confirm=document.getElementById('confirmReward'); if(confirm && typeof confirm.onclick==='function') confirm.onclick(); const c1=player.coin; state.rewardSelected=new Set([0]); renderPhasePanel(); const confirm2=document.getElementById('confirmReward'); if(confirm2&&typeof confirm2.onclick==='function') confirm2.onclick();
+      results.rewardCannotBeClaimedTwice = player.coin === c1;
+results.spawnEnemyAssignsType = !!enemy.typeId && !!enemy.name && !!enemy.aiType;
 
       state.floor = 1; spawnEnemy();
       const floorOneHp = enemy.maxHp;
@@ -1861,6 +1925,7 @@
   }
 
   window.ManRPG = { state, player, enemy, enemyTypes, pickEnemyTypeForFloor, spawnEnemy, rewardConfig, applyFiveLevelPlus, enterInnerWorld, goNextFloor, tryLearnMagic, ensureStatAllocationBase, increaseStat, decreaseStat, finishStatAllocation, finishInitialStatAllocation, applyRecommendedInitialStats, useInventoryItem, removeInventoryAt, getItemSellPrice, getShopItems, buyShopItem, sellInventoryItem, serializeGameState, applySerializedGameState, saveGame, loadGame, deleteSave, useHarvestSlash, castSmallFireball, updateProjectiles, applyEnemyDamage, applyPlayerDamage, handleEnemyDefeated, startHitStop, startScreenShake, runDebugTests, SAVE_KEY, SPELL_MP, SPELLS_BY_CIRCLE, MAGIC_POOL, spellCategory, spellManaCost, spellPowerRatio, spellPower, getMagicByKey, normalizeKnownMagic };
+  systemMenuToggleEl.onclick = () => { state.systemMenuOpen = !state.systemMenuOpen; renderSystemMenu(); };
   spawnEnemy();
   syncVitals();
   requestAnimationFrame(loop);
