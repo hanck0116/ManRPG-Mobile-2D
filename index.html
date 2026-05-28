@@ -3,38 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ManRPG-Mobile-2D v0.1</title>
+  <title>ManRPG Mobile PWA Prototype</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="app game-root">
-    <section class="battle-wrap">
-      <canvas id="gameCanvas" width="960" height="360" aria-label="battle canvas"></canvas>
-      <section class="hud compact" id="hud"></section>
-      <section class="phase-panel" id="phasePanel"></section>
-      <section class="enemy-bar" id="enemyBar"></section>
-      <button id="systemMenuToggle" class="system-menu-toggle" aria-label="system menu">☰</button>
-      <section id="systemMenu" class="system-menu hidden"></section>
-      <section id="quickSlotTray" class="quick-slot-tray"></section>
-      <section id="skillMagicOverlay" class="skill-magic-overlay hidden"></section>
-    </section>
-  </main>
+  <main class="app" aria-label="ManRPG Mobile PWA 기본 화면">
+    <header class="status-bar" id="statusBar">
+      <div>HP 100 / 100</div>
+      <div>MP 40 / 40</div>
+      <div>턴 1</div>
+      <div>적 1 / 1</div>
+    </header>
 
-  <section class="controls" id="controls">
-    <div class="control-group left">
-      <button data-action="left">←</button>
-      <button data-action="right">→</button>
-    </div>
-    <div class="control-group center">
-      <button data-action="jump">점프</button>
-      <button data-action="dash">대시</button>
-    </div>
-    <div class="control-group right">
+    <section class="battle-log" id="battleLog" aria-live="polite">
+      <p>[전투 시작] 7x7 전술 맵에 진입했습니다.</p>
+      <p>고블린이 전방에서 대기 중입니다.</p>
+      <p>행동을 선택하세요.</p>
+    </section>
+
+    <section class="map-wrap" aria-label="2D 전술 맵">
+      <div class="map-grid" id="mapGrid"></div>
+    </section>
+
+    <nav class="action-bar" id="actionBar" aria-label="행동 버튼">
       <button data-action="attack">공격</button>
       <button data-action="skill">스킬</button>
-      <button data-action="magic">마법</button>
-    </div>
-  </section>
+      <button data-action="guard">방어</button>
+      <button data-action="wait">대기</button>
+    </nav>
+  </main>
 
   <script src="game.js"></script>
 </body>
