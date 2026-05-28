@@ -1,27 +1,88 @@
-:root{--bg:#050c1e;--panel:rgba(13,27,53,.78);--line:#2d6db1;--text:#e6f1ff;--accent:#5fb3ff;--danger:#f0625f}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0,#0b1f48,#050c1e 60%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none;overflow:hidden}
-.app{padding:8px}.battle-wrap{position:relative;max-width:1100px;margin:0 auto;height:calc(100dvh - 146px);min-height:300px}#gameCanvas{width:100%;height:100%;border:1px solid var(--line);border-radius:14px;background:#0f1b2a}
-.hud.compact,.phase-panel,.enemy-bar,.quick-slot-tray,.system-menu,.skill-magic-overlay{border:1px solid var(--line);border-radius:12px;background:var(--panel);backdrop-filter:blur(4px)}
-.hud.compact{position:absolute;left:14px;top:14px;padding:10px;min-width:200px;font-size:13px;z-index:3}.enemy-bar{position:absolute;top:14px;left:50%;transform:translateX(-50%);min-width:280px;padding:8px 12px;z-index:3}
-.enemy-hp{height:10px;background:#2a3348;border-radius:999px;overflow:hidden}.enemy-hp>i{display:block;height:100%;background:#e34b4b}
-.system-menu-toggle{position:absolute;right:14px;top:14px;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:22px;z-index:5}
-.system-menu{position:absolute;right:14px;top:64px;padding:10px;display:grid;gap:6px;min-width:180px;z-index:5}.hidden{display:none!important}
-.phase-panel{position:absolute;left:50%;bottom:108px;transform:translateX(-50%);padding:10px;max-width:660px;width:92%;font-size:14px;z-index:4}
-.phase-panel.modal-card{bottom:50%;transform:translate(-50%,50%);max-height:72%;overflow:auto;width:min(760px,94%);padding:14px}
-.phase-panel.compact-notice{max-width:360px;width:min(88%,360px);bottom:114px;left:50%;padding:8px 10px;min-height:34px;font-size:12px;line-height:1.3}
-.quick-slot-tray{position:absolute;right:12px;bottom:114px;width:min(308px,46vw);padding:8px;z-index:4}.quick-slot-tray.collapsed{width:132px;min-width:120px}
-.slot-tabs{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}.slot-tabs span,.slot-tabs button{white-space:nowrap}.slot-page{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px}.slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
-.slot{min-height:54px;border:1px solid #2f5689;background:#0b1836;color:var(--text);border-radius:10px;font-size:12px}.slot.selected{outline:2px solid #6bc1ff}
-.controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;max-width:1100px;margin:6px auto;padding:6px 8px 8px;align-items:end;min-height:124px}
-.control-group{border:1px solid var(--line);border-radius:14px;padding:8px;display:grid;gap:8px;background:rgba(9,21,42,.45)}
-.control-group.left{grid-template-columns:1fr 1fr}.control-group.center{grid-template-columns:1fr 1fr}.control-group.right{grid-template-columns:1.25fr 1fr 1fr;align-items:center}
-.controls button,.phase-panel button,.system-menu button,.skill-magic-overlay button{min-height:48px;border:1px solid var(--line);border-radius:12px;background:#15325f;color:var(--text);font-size:17px}
-.controls button[data-action='attack']{font-size:24px;background:#234f8e;border-radius:999px;min-height:72px}
-.skill-magic-overlay{position:absolute;inset:9% 11%;padding:12px;z-index:6;overflow:auto;max-height:78%}
-.overlay-head{display:flex;justify-content:space-between}.overlay-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
-.inner-world-dim .controls{opacity:.14;filter:saturate(.2) blur(.5px);pointer-events:none}.inner-world-menu-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.inner-world-menu-grid button[disabled]{opacity:.6}.inner-world-menu-grid #btnNext{background:#2360a8;border-color:#6fb9ff}
-.warn{color:#ffd166}.enemy{color:#ff9e80}.tag{color:#9ad1ff}.stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
-@media (orientation:portrait){body::before{content:'가로 화면 권장';position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.65);z-index:20;font-size:22px}}
+:root {
+  --bg: #0a1020;
+  --panel: #111a33;
+  --line: #2f4675;
+  --text: #eef4ff;
+  --ally: #5fb3ff;
+  --enemy: #ff6b6b;
+  --tile: #162240;
+  --tile-alt: #13203a;
+}
 
-@media (max-width:900px){.quick-slot-tray{width:min(276px,52vw)}.slot{min-height:48px}.controls button{font-size:15px}.controls button[data-action='attack']{min-height:62px}}
-@media (max-width:760px){.quick-slot-tray{bottom:102px;width:min(248px,58vw)}.quick-slot-tray.collapsed{width:124px}.controls{gap:6px;padding:4px 6px 8px;min-height:116px}.control-group{padding:6px;gap:6px}.controls button{min-height:48px;font-size:14px}}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #101c3e 0%, #080d1a 65%);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 10px;
+  padding: 10px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.status-bar,
+.battle-log,
+.map-wrap,
+.action-bar {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.status-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.battle-log {
+  padding: 10px;
+  overflow: auto;
+  min-height: 120px;
+}
+.battle-log p { margin: 0 0 6px; font-size: 14px; }
+
+.map-wrap { padding: 10px; }
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  gap: 4px;
+  aspect-ratio: 1 / 1;
+}
+.tile {
+  border: 1px solid #243a66;
+  border-radius: 8px;
+  background: var(--tile);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+.tile:nth-child(odd) { background: var(--tile-alt); }
+.tile.player { outline: 2px solid var(--ally); }
+.tile.enemy { outline: 2px solid var(--enemy); }
+
+.action-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+.action-bar button {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 48px;
+  background: #1a2a4d;
+  color: var(--text);
+  font-size: 15px;
+}
